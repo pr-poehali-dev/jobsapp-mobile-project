@@ -79,6 +79,8 @@ export default function Admin() {
   const [showUserDialog, setShowUserDialog] = useState(false);
   const [showVacancyDialog, setShowVacancyDialog] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [userSearchQuery, setUserSearchQuery] = useState('');
+  const [usersLoading, setUsersLoading] = useState(false);
 
   useEffect(() => {
     checkAuth();
@@ -311,6 +313,31 @@ export default function Admin() {
     v.employer_name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  const filteredUsers = users.filter(u => 
+    u.name.toLowerCase().includes(userSearchQuery.toLowerCase()) ||
+    (u.email && u.email.toLowerCase().includes(userSearchQuery.toLowerCase())) ||
+    (u.phone && u.phone.includes(userSearchQuery))
+  );
+
+  const loadUsers = async () => {
+    setUsersLoading(true);
+    try {
+      const response = await fetch(`${ADMIN_API}?path=users&limit=100`);
+      const data = await response.json();
+      if (data.success) {
+        setUsers(data.users);
+      }
+    } catch (error) {
+      toast({
+        title: 'Ошибка',
+        description: 'Не удалось загрузить пользователей',
+        variant: 'destructive'
+      });
+    } finally {
+      setUsersLoading(false);
+    }
+  };
+
   if (isCheckingAuth) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -404,8 +431,9 @@ export default function Admin() {
 
       <div className="container mx-auto px-4 py-6">
         <Tabs defaultValue="moderation" className="space-y-4">
-          <TabsList className="grid w-full grid-cols-2">
+          <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="moderation">Модерация</TabsTrigger>
+            <TabsTrigger value="users">Пользователи</TabsTrigger>
             <TabsTrigger value="stats">Статистика</TabsTrigger>
           </TabsList>
 
@@ -492,6 +520,90 @@ export default function Admin() {
                                 Отклонить
                               </Button>
                             </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="users" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Управление пользователями</CardTitle>
+                <CardDescription>
+                  Всего пользователей: {stats?.users.total_seekers + stats?.users.total_employers + stats?.users.total_admins || 0}
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="flex gap-2 mb-4">
+                  <Input
+                    placeholder="Поиск по имени, email или телефону..."
+                    value={userSearchQuery}
+                    onChange={(e) => setUserSearchQuery(e.target.value)}
+                    className="flex-1"
+                  />
+                  <Button onClick={loadUsers} disabled={usersLoading}>
+                    {usersLoading ? <Icon name="Loader2" size={16} className="animate-spin" /> : <Icon name="RefreshCw" size={16} />}
+                  </Button>
+                </div>
+
+                {usersLoading ? (
+                  <div className="text-center py-8">
+                    <Icon name="Loader2" size={32} className="animate-spin mx-auto text-muted-foreground" />
+                  </div>
+                ) : filteredUsers.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <Icon name="Users" size={48} className="mx-auto mb-2" />
+                    <p>Пользователи не найдены</p>
+                    <Button onClick={loadUsers} variant="outline" className="mt-4">
+                      Загрузить пользователей
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {filteredUsers.map((user) => (
+                      <Card key={user.id} className="cursor-pointer hover:shadow-md transition-shadow"
+                        onClick={() => {
+                          setSelectedUser(user);
+                          setShowUserDialog(true);
+                        }}>
+                        <CardHeader>
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1">
+                              <CardTitle className="text-lg flex items-center gap-2">
+                                {user.name}
+                                {user.role === 'admin' && <Badge variant="destructive">Admin</Badge>}
+                              </CardTitle>
+                              <CardDescription className="mt-1">
+                                {user.email || 'Email не указан'} • {user.phone || 'Телефон не указан'}
+                              </CardDescription>
+                            </div>
+                            <Badge variant="outline">{user.tier}</Badge>
+                          </div>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="flex items-center justify-between text-sm">
+                            <div className="flex gap-4">
+                              <div>
+                                <span className="text-muted-foreground">Баланс: </span>
+                                <span className="font-semibold text-primary">{user.balance} ₽</span>
+                              </div>
+                              <div>
+                                <span className="text-muted-foreground">Роль: </span>
+                                <span className="font-semibold">{user.role}</span>
+                              </div>
+                              <div>
+                                <span className="text-muted-foreground">Вакансий: </span>
+                                <span className="font-semibold">{user.vacancies_this_month}</span>
+                              </div>
+                            </div>
+                            <span className="text-xs text-muted-foreground">
+                              {new Date(user.created_at).toLocaleDateString('ru-RU')}
+                            </span>
                           </div>
                         </CardContent>
                       </Card>
@@ -670,22 +782,38 @@ export default function Admin() {
           </DialogHeader>
           {selectedUser && (
             <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label>Email</Label>
-                  <p className="text-sm mt-1">{selectedUser.email || 'Не указан'}</p>
-                </div>
-                <div>
-                  <Label>Телефон</Label>
-                  <p className="text-sm mt-1">{selectedUser.phone || 'Не указан'}</p>
-                </div>
-                <div>
-                  <Label>Роль</Label>
-                  <p className="text-sm mt-1">{selectedUser.role}</p>
-                </div>
-                <div>
-                  <Label>Баланс</Label>
-                  <p className="text-sm mt-1 font-semibold text-primary">{selectedUser.balance} ₽</p>
+              <div className="space-y-3">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label>Имя</Label>
+                    <p className="text-sm mt-1 font-semibold">{selectedUser.name}</p>
+                  </div>
+                  <div>
+                    <Label>Дата регистрации</Label>
+                    <p className="text-sm mt-1">
+                      {new Date(selectedUser.created_at).toLocaleDateString('ru-RU', { 
+                        day: 'numeric', 
+                        month: 'long', 
+                        year: 'numeric' 
+                      })}
+                    </p>
+                  </div>
+                  <div>
+                    <Label>Email</Label>
+                    <p className="text-sm mt-1">{selectedUser.email || 'Не указан'}</p>
+                  </div>
+                  <div>
+                    <Label>Телефон</Label>
+                    <p className="text-sm mt-1">{selectedUser.phone || 'Не указан'}</p>
+                  </div>
+                  <div>
+                    <Label>Роль</Label>
+                    <p className="text-sm mt-1">{selectedUser.role}</p>
+                  </div>
+                  <div>
+                    <Label>Баланс</Label>
+                    <p className="text-sm mt-1 font-semibold text-primary">{selectedUser.balance} ₽</p>
+                  </div>
                 </div>
               </div>
               <div>

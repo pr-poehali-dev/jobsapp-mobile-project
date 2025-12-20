@@ -57,30 +57,51 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
 
 def get_user(params: Dict, conn) -> Dict[str, Any]:
     user_id = params.get('user_id')
-    
-    if not user_id:
-        return error_response(400, 'user_id required')
+    limit = int(params.get('limit', 100))
     
     with conn.cursor(cursor_factory=RealDictCursor) as cur:
+        # Если указан user_id - возвращаем конкретного пользователя
+        if user_id:
+            cur.execute("""
+                SELECT id, name, email, phone, role, balance, tier, 
+                       vacancies_this_month, email_verified, phone_verified,
+                       created_at, updated_at
+                FROM users 
+                WHERE id = %s
+            """, (user_id,))
+            
+            user = cur.fetchone()
+            
+            if not user:
+                return error_response(404, 'User not found')
+            
+            return {
+                'statusCode': 200,
+                'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
+                'body': json.dumps({
+                    'success': True,
+                    'user': dict(user)
+                }, default=str),
+                'isBase64Encoded': False
+            }
+        
+        # Иначе возвращаем список всех пользователей
         cur.execute("""
             SELECT id, name, email, phone, role, balance, tier, 
-                   vacancies_this_month, email_verified, phone_verified,
-                   created_at, updated_at
+                   vacancies_this_month, created_at
             FROM users 
-            WHERE id = %s
-        """, (user_id,))
+            ORDER BY created_at DESC
+            LIMIT %s
+        """, (limit,))
         
-        user = cur.fetchone()
-        
-        if not user:
-            return error_response(404, 'User not found')
+        users = cur.fetchall()
         
         return {
             'statusCode': 200,
             'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
             'body': json.dumps({
                 'success': True,
-                'user': dict(user)
+                'users': [dict(u) for u in users]
             }, default=str),
             'isBase64Encoded': False
         }
