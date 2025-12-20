@@ -1,14 +1,656 @@
-// Update this page (the content is just a fallback if you fail to update the page)
+import { useState } from 'react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
+import Icon from '@/components/ui/icon';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { toast } from '@/hooks/use-toast';
 
-const Index = () => {
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100">
-      <div className="text-center">
-        <h1 className="text-4xl font-bold mb-4 color-black text-black">Добро пожаловать!</h1>
-        <p className="text-xl text-gray-600">тут будет отображаться ваш проект</p>
-      </div>
-    </div>
-  );
+type UserRole = 'guest' | 'seeker' | 'employer' | 'admin';
+
+type Vacancy = {
+  id: string;
+  title: string;
+  description: string;
+  salary: string;
+  city: string;
+  phone: string;
+  employerName: string;
+  employerTier: 'FREE' | 'ECONOM' | 'VIP' | 'PREMIUM';
+  tags: string[];
+  image?: string;
+  status: 'pending' | 'published' | 'rejected';
 };
 
-export default Index;
+type User = {
+  id: string;
+  name: string;
+  email: string;
+  phone: string;
+  role: UserRole;
+  balance: number;
+  tier: 'FREE' | 'ECONOM' | 'VIP' | 'PREMIUM';
+  vacanciesThisMonth: number;
+};
+
+const TIERS = [
+  { name: 'FREE', price: 0, limit: 1, badge: '' },
+  { name: 'ECONOM', price: 100, limit: 5, badge: '' },
+  { name: 'VIP', price: 500, limit: 30, badge: '⭐' },
+  { name: 'PREMIUM', price: 2500, limit: 150, badge: '👑' },
+];
+
+const TAGS = [
+  'Вахтовый метод',
+  'Подработка',
+  'Ежедневная оплата',
+  'Без опыта',
+  'С опытом',
+  'Для студентов',
+];
+
+const MOCK_VACANCIES: Vacancy[] = [
+  {
+    id: '1',
+    title: 'Менеджер по продажам',
+    description: 'Требуется активный менеджер для работы с клиентами. Полная занятость, официальное трудоустройство.',
+    salary: '60 000 - 80 000 ₽',
+    city: 'Москва',
+    phone: '+7 (999) 123-45-67',
+    employerName: 'ООО "Продажи+"',
+    employerTier: 'VIP',
+    tags: ['С опытом', 'Ежедневная оплата'],
+    status: 'published',
+  },
+  {
+    id: '2',
+    title: 'Грузчик на склад',
+    description: 'Работа на крупном складе. График 2/2. Без опыта, обучение на месте.',
+    salary: '45 000 ₽',
+    city: 'Санкт-Петербург',
+    phone: '+7 (999) 987-65-43',
+    employerName: 'Склад №1',
+    employerTier: 'PREMIUM',
+    tags: ['Без опыта', 'Вахтовый метод'],
+    status: 'published',
+  },
+  {
+    id: '3',
+    title: 'Курьер',
+    description: 'Доставка заказов по городу. Свободный график, ежедневные выплаты.',
+    salary: 'от 50 000 ₽',
+    city: 'Киров',
+    phone: '+7 (999) 555-44-33',
+    employerName: 'Быстрая доставка',
+    employerTier: 'ECONOM',
+    tags: ['Подработка', 'Ежедневная оплата', 'Для студентов'],
+    status: 'published',
+  },
+];
+
+const ADMIN_PHONE = '+79992255109';
+const ADMIN_PASSWORD = '23112311!!';
+
+export default function Index() {
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [vacancies, setVacancies] = useState<Vacancy[]>(MOCK_VACANCIES);
+  const [currentVacancyIndex, setCurrentVacancyIndex] = useState(0);
+  const [showAuthDialog, setShowAuthDialog] = useState(false);
+  const [showProfileDialog, setShowProfileDialog] = useState(false);
+  const [showBalanceDialog, setShowBalanceDialog] = useState(false);
+  const [showVacancyDialog, setShowVacancyDialog] = useState(false);
+  const [showAdminDialog, setShowAdminDialog] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
+
+  const handleSwipeNext = () => {
+    if (currentVacancyIndex < filteredVacancies.length - 1) {
+      setCurrentVacancyIndex(currentVacancyIndex + 1);
+    } else {
+      setCurrentVacancyIndex(0);
+    }
+  };
+
+  const handleAuth = (role: 'seeker' | 'employer', data: any) => {
+    if (role === 'employer' && data.phone === ADMIN_PHONE && data.password === ADMIN_PASSWORD) {
+      setCurrentUser({
+        id: 'admin',
+        name: 'Администратор',
+        email: 'admin@jobsapp.ru',
+        phone: ADMIN_PHONE,
+        role: 'admin',
+        balance: 0,
+        tier: 'PREMIUM',
+        vacanciesThisMonth: 0,
+      });
+      setShowAuthDialog(false);
+      setShowAdminDialog(true);
+      toast({ title: 'Вход выполнен', description: 'Добро пожаловать, Администратор!' });
+      return;
+    }
+
+    const newUser: User = {
+      id: Date.now().toString(),
+      name: data.name || 'Пользователь',
+      email: data.email || '',
+      phone: data.phone || '',
+      role: role,
+      balance: role === 'employer' ? 30 : 0,
+      tier: 'FREE',
+      vacanciesThisMonth: 0,
+    };
+
+    setCurrentUser(newUser);
+    setShowAuthDialog(false);
+
+    if (role === 'employer') {
+      toast({
+        title: 'Регистрация успешна!',
+        description: '🎁 На вашем счету 30 ₽. Пополните баланс на 200 ₽ для быстрого старта!',
+        action: (
+          <Button size="sm" onClick={() => setShowBalanceDialog(true)}>
+            Пополнить
+          </Button>
+        ),
+      });
+    } else {
+      toast({ title: 'Вход выполнен', description: 'Теперь вы можете просматривать контакты работодателей' });
+    }
+  };
+
+  const handleAddBalance = (amount: number) => {
+    if (currentUser) {
+      setCurrentUser({ ...currentUser, balance: currentUser.balance + amount });
+      setShowBalanceDialog(false);
+      toast({ title: 'Баланс пополнен', description: `+${amount} ₽` });
+    }
+  };
+
+  const handleCreateVacancy = (vacancy: Partial<Vacancy>) => {
+    if (!currentUser) return;
+
+    const cost = 50;
+    if (currentUser.balance < cost) {
+      toast({ title: 'Недостаточно средств', description: 'Пополните баланс', variant: 'destructive' });
+      return;
+    }
+
+    const tierLimit = TIERS.find((t) => t.name === currentUser.tier)?.limit || 1;
+    if (currentUser.vacanciesThisMonth >= tierLimit) {
+      toast({
+        title: 'Лимит исчерпан',
+        description: 'Повысьте тариф или купите объявление за 50 ₽',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    const newVacancy: Vacancy = {
+      id: Date.now().toString(),
+      title: vacancy.title || '',
+      description: vacancy.description || '',
+      salary: vacancy.salary || '',
+      city: vacancy.city || '',
+      phone: vacancy.phone || currentUser.phone,
+      employerName: currentUser.name,
+      employerTier: currentUser.tier,
+      tags: vacancy.tags || [],
+      status: 'pending',
+    };
+
+    setVacancies([...vacancies, newVacancy]);
+    setCurrentUser({ ...currentUser, balance: currentUser.balance - cost, vacanciesThisMonth: currentUser.vacanciesThisMonth + 1 });
+    setShowVacancyDialog(false);
+
+    toast({
+      title: 'Объявление отправлено',
+      description: 'Ожидайте модерации. Вы получите уведомление после проверки.',
+    });
+  };
+
+  const filteredVacancies = vacancies.filter((v) => {
+    if (v.status !== 'published') return false;
+    if (searchQuery && !v.title.toLowerCase().includes(searchQuery.toLowerCase())) return false;
+    if (selectedTags.length > 0 && !selectedTags.some((tag) => v.tags.includes(tag))) return false;
+    return true;
+  });
+
+  const currentVacancy = filteredVacancies[currentVacancyIndex];
+
+  return (
+    <div className="min-h-screen bg-background flex flex-col">
+      <header className="sticky top-0 z-50 bg-accent text-accent-foreground shadow-md">
+        <div className="container mx-auto px-4 py-3 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Icon name="Briefcase" size={24} />
+            <h1 className="text-xl font-bold">JobsApp</h1>
+          </div>
+          <div className="flex items-center gap-2">
+            {currentUser ? (
+              currentUser.role === 'admin' ? (
+                <Button size="sm" variant="outline" onClick={() => setShowAdminDialog(true)}>
+                  <Icon name="Shield" size={16} />
+                </Button>
+              ) : (
+                <>
+                  {currentUser.role === 'employer' && (
+                    <Button size="sm" onClick={() => setShowVacancyDialog(true)}>
+                      Разместить вакансию
+                    </Button>
+                  )}
+                  <Button size="sm" variant="outline" onClick={() => setShowProfileDialog(true)}>
+                    {currentUser.name}
+                    {currentUser.role === 'employer' && (
+                      <Badge variant="secondary" className="ml-2">
+                        {currentUser.balance} ₽
+                      </Badge>
+                    )}
+                  </Button>
+                </>
+              )
+            ) : (
+              <Button size="sm" onClick={() => setShowAuthDialog(true)}>
+                Войти
+              </Button>
+            )}
+          </div>
+        </div>
+      </header>
+
+      <div className="container mx-auto px-4 py-4 flex-1 flex flex-col">
+        <div className="mb-4 space-y-3">
+          <Input
+            placeholder="Поиск вакансий..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full"
+          />
+          <div className="flex gap-2 flex-wrap">
+            {TAGS.map((tag) => (
+              <Badge
+                key={tag}
+                variant={selectedTags.includes(tag) ? 'default' : 'outline'}
+                className="cursor-pointer"
+                onClick={() => {
+                  if (selectedTags.includes(tag)) {
+                    setSelectedTags(selectedTags.filter((t) => t !== tag));
+                  } else {
+                    setSelectedTags([...selectedTags, tag]);
+                  }
+                }}
+              >
+                {tag}
+              </Badge>
+            ))}
+          </div>
+        </div>
+
+        <div className="flex-1 flex items-center justify-center">
+          {filteredVacancies.length === 0 ? (
+            <div className="text-center py-12">
+              <Icon name="BriefcaseX" size={48} className="mx-auto mb-4 text-muted-foreground" />
+              <p className="text-muted-foreground">Вакансий не найдено</p>
+            </div>
+          ) : (
+            <Card className="w-full max-w-md swipe-card animate-fade-in" onClick={handleSwipeNext}>
+              <CardHeader>
+                <div className="flex items-start justify-between">
+                  <div className="flex-1">
+                    <CardTitle className="text-xl">{currentVacancy.title}</CardTitle>
+                    <CardDescription className="flex items-center gap-2 mt-1">
+                      <Icon name="MapPin" size={14} />
+                      {currentVacancy.city}
+                    </CardDescription>
+                  </div>
+                  {currentVacancy.employerTier !== 'FREE' && (
+                    <Badge variant="secondary">
+                      {TIERS.find((t) => t.name === currentVacancy.employerTier)?.badge}
+                      {currentVacancy.employerTier}
+                    </Badge>
+                  )}
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex flex-wrap gap-2">
+                  {currentVacancy.tags.map((tag) => (
+                    <Badge key={tag} variant="outline">
+                      {tag}
+                    </Badge>
+                  ))}
+                </div>
+                <p className="text-sm text-muted-foreground line-clamp-3">{currentVacancy.description}</p>
+                <div className="pt-2 border-t space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-muted-foreground">Зарплата:</span>
+                    <span className="font-semibold text-primary">{currentVacancy.salary}</span>
+                  </div>
+                  {currentUser && currentUser.role !== 'guest' ? (
+                    <>
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-muted-foreground">Работодатель:</span>
+                        <span className="text-sm font-medium">{currentVacancy.employerName}</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-muted-foreground">Телефон:</span>
+                        <a href={`tel:${currentVacancy.phone}`} className="text-sm font-medium text-primary hover:underline">
+                          {currentVacancy.phone}
+                        </a>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="bg-muted p-3 rounded-md text-center">
+                      <p className="text-sm text-muted-foreground mb-2">Войдите, чтобы увидеть контакты</p>
+                      <Button size="sm" onClick={() => setShowAuthDialog(true)}>
+                        Войти
+                      </Button>
+                    </div>
+                  )}
+                </div>
+                <div className="text-center text-xs text-muted-foreground pt-2">
+                  <Icon name="ArrowRight" size={16} className="inline mr-1" />
+                  Свайп для следующей вакансии ({currentVacancyIndex + 1}/{filteredVacancies.length})
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      </div>
+
+      <footer className="bg-accent text-accent-foreground py-4 mt-8">
+        <div className="container mx-auto px-4 text-center text-sm">
+          <p>Обратная связь: jobsapp@yandex.ru</p>
+        </div>
+      </footer>
+
+      <AuthDialog open={showAuthDialog} onClose={() => setShowAuthDialog(false)} onAuth={handleAuth} />
+      <ProfileDialog
+        open={showProfileDialog}
+        onClose={() => setShowProfileDialog(false)}
+        user={currentUser}
+        onAddBalance={() => {
+          setShowProfileDialog(false);
+          setShowBalanceDialog(true);
+        }}
+      />
+      <BalanceDialog open={showBalanceDialog} onClose={() => setShowBalanceDialog(false)} onAdd={handleAddBalance} />
+      <VacancyDialog open={showVacancyDialog} onClose={() => setShowVacancyDialog(false)} onCreate={handleCreateVacancy} />
+      <AdminDialog
+        open={showAdminDialog}
+        onClose={() => setShowAdminDialog(false)}
+        vacancies={vacancies}
+        onApprove={(id) => {
+          setVacancies(vacancies.map((v) => (v.id === id ? { ...v, status: 'published' } : v)));
+          toast({ title: 'Объявление одобрено' });
+        }}
+        onReject={(id) => {
+          setVacancies(vacancies.map((v) => (v.id === id ? { ...v, status: 'rejected' } : v)));
+          toast({ title: 'Объявление отклонено' });
+        }}
+      />
+    </div>
+  );
+}
+
+function AuthDialog({ open, onClose, onAuth }: { open: boolean; onClose: () => void; onAuth: (role: 'seeker' | 'employer', data: any) => void }) {
+  const [authData, setAuthData] = useState({ name: '', phone: '', email: '', password: '' });
+
+  return (
+    <Dialog open={open} onOpenChange={onClose}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Вход или регистрация</DialogTitle>
+          <DialogDescription>Выберите роль и заполните данные</DialogDescription>
+        </DialogHeader>
+        <Tabs defaultValue="seeker">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="seeker">Соискатель</TabsTrigger>
+            <TabsTrigger value="employer">Работодатель</TabsTrigger>
+          </TabsList>
+          <TabsContent value="seeker" className="space-y-3">
+            <Input placeholder="Имя" value={authData.name} onChange={(e) => setAuthData({ ...authData, name: e.target.value })} />
+            <Input placeholder="Email" type="email" value={authData.email} onChange={(e) => setAuthData({ ...authData, email: e.target.value })} />
+            <Button className="w-full" onClick={() => onAuth('seeker', authData)}>
+              Войти как соискатель
+            </Button>
+          </TabsContent>
+          <TabsContent value="employer" className="space-y-3">
+            <Input placeholder="Имя или название компании" value={authData.name} onChange={(e) => setAuthData({ ...authData, name: e.target.value })} />
+            <Input placeholder="Телефон" value={authData.phone} onChange={(e) => setAuthData({ ...authData, phone: e.target.value })} />
+            <Input placeholder="Email" type="email" value={authData.email} onChange={(e) => setAuthData({ ...authData, email: e.target.value })} />
+            <Input placeholder="Пароль" type="password" value={authData.password} onChange={(e) => setAuthData({ ...authData, password: e.target.value })} />
+            <Button className="w-full" onClick={() => onAuth('employer', authData)}>
+              Войти как работодатель
+            </Button>
+          </TabsContent>
+        </Tabs>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function ProfileDialog({ open, onClose, user, onAddBalance }: { open: boolean; onClose: () => void; user: User | null; onAddBalance: () => void }) {
+  if (!user) return null;
+
+  return (
+    <Dialog open={open} onOpenChange={onClose}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Личный кабинет</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4">
+          <div>
+            <Label>Имя</Label>
+            <p className="text-sm mt-1">{user.name}</p>
+          </div>
+          <div>
+            <Label>Email</Label>
+            <p className="text-sm mt-1">{user.email || 'Не указан'}</p>
+          </div>
+          <div>
+            <Label>Телефон</Label>
+            <p className="text-sm mt-1">{user.phone || 'Не указан'}</p>
+          </div>
+          {user.role === 'employer' && (
+            <>
+              <div className="flex items-center justify-between">
+                <div>
+                  <Label>Баланс</Label>
+                  <p className="text-2xl font-bold text-primary mt-1">{user.balance} ₽</p>
+                </div>
+                <Button size="sm" onClick={onAddBalance}>
+                  <Icon name="Plus" size={16} className="mr-1" />
+                  Пополнить
+                </Button>
+              </div>
+              <div>
+                <Label>Тариф</Label>
+                <p className="text-sm mt-1">
+                  {user.tier} ({user.vacanciesThisMonth}/{TIERS.find((t) => t.name === user.tier)?.limit} объявлений)
+                </p>
+              </div>
+            </>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function BalanceDialog({ open, onClose, onAdd }: { open: boolean; onClose: () => void; onAdd: (amount: number) => void }) {
+  const [amount, setAmount] = useState('200');
+
+  return (
+    <Dialog open={open} onOpenChange={onClose}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Пополнение баланса</DialogTitle>
+          <DialogDescription>Введите сумму для пополнения</DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4">
+          <Input type="number" placeholder="Сумма" value={amount} onChange={(e) => setAmount(e.target.value)} />
+          <div className="grid grid-cols-3 gap-2">
+            {[200, 500, 1000].map((preset) => (
+              <Button key={preset} variant="outline" size="sm" onClick={() => setAmount(preset.toString())}>
+                {preset} ₽
+              </Button>
+            ))}
+          </div>
+          <Button
+            className="w-full"
+            onClick={() => {
+              const num = parseInt(amount);
+              if (num > 0) {
+                onAdd(num);
+              }
+            }}
+          >
+            Пополнить через ЮMoney
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function VacancyDialog({ open, onClose, onCreate }: { open: boolean; onClose: () => void; onCreate: (vacancy: Partial<Vacancy>) => void }) {
+  const [vacancy, setVacancy] = useState<Partial<Vacancy>>({
+    title: '',
+    description: '',
+    salary: '',
+    city: '',
+    phone: '',
+    tags: [],
+  });
+
+  const toggleTag = (tag: string) => {
+    const tags = vacancy.tags || [];
+    if (tags.includes(tag)) {
+      setVacancy({ ...vacancy, tags: tags.filter((t) => t !== tag) });
+    } else {
+      setVacancy({ ...vacancy, tags: [...tags, tag] });
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onClose}>
+      <DialogContent className="max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Создать вакансию</DialogTitle>
+          <DialogDescription>Заполните информацию о вакансии</DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4">
+          <div>
+            <Label>Название вакансии</Label>
+            <Input placeholder="Менеджер по продажам" value={vacancy.title} onChange={(e) => setVacancy({ ...vacancy, title: e.target.value })} />
+          </div>
+          <div>
+            <Label>Описание</Label>
+            <Textarea
+              placeholder="Требования, условия работы..."
+              value={vacancy.description}
+              onChange={(e) => setVacancy({ ...vacancy, description: e.target.value })}
+              rows={4}
+            />
+          </div>
+          <div>
+            <Label>Зарплата</Label>
+            <Input placeholder="50 000 - 70 000 ₽" value={vacancy.salary} onChange={(e) => setVacancy({ ...vacancy, salary: e.target.value })} />
+          </div>
+          <div>
+            <Label>Город</Label>
+            <Input placeholder="Москва" value={vacancy.city} onChange={(e) => setVacancy({ ...vacancy, city: e.target.value })} />
+          </div>
+          <div>
+            <Label>Телефон для связи</Label>
+            <Input placeholder="+7 (999) 123-45-67" value={vacancy.phone} onChange={(e) => setVacancy({ ...vacancy, phone: e.target.value })} />
+          </div>
+          <div>
+            <Label>Теги</Label>
+            <div className="flex flex-wrap gap-2 mt-2">
+              {TAGS.map((tag) => (
+                <div key={tag} className="flex items-center gap-2">
+                  <Checkbox checked={vacancy.tags?.includes(tag)} onCheckedChange={() => toggleTag(tag)} />
+                  <label className="text-sm cursor-pointer" onClick={() => toggleTag(tag)}>
+                    {tag}
+                  </label>
+                </div>
+              ))}
+            </div>
+          </div>
+          <Button className="w-full" onClick={() => onCreate(vacancy)}>
+            Создать объявление (50 ₽)
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function AdminDialog({
+  open,
+  onClose,
+  vacancies,
+  onApprove,
+  onReject,
+}: {
+  open: boolean;
+  onClose: () => void;
+  vacancies: Vacancy[];
+  onApprove: (id: string) => void;
+  onReject: (id: string) => void;
+}) {
+  const pendingVacancies = vacancies.filter((v) => v.status === 'pending');
+
+  return (
+    <Dialog open={open} onOpenChange={onClose}>
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Админ-панель</DialogTitle>
+          <DialogDescription>Модерация объявлений ({pendingVacancies.length})</DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4">
+          {pendingVacancies.length === 0 ? (
+            <p className="text-center text-muted-foreground py-8">Нет объявлений на модерации</p>
+          ) : (
+            pendingVacancies.map((vacancy) => (
+              <Card key={vacancy.id}>
+                <CardHeader>
+                  <CardTitle className="text-lg">{vacancy.title}</CardTitle>
+                  <CardDescription>
+                    {vacancy.employerName} • {vacancy.city}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <p className="text-sm">{vacancy.description}</p>
+                  <div className="flex gap-2">
+                    {vacancy.tags.map((tag) => (
+                      <Badge key={tag} variant="outline">
+                        {tag}
+                      </Badge>
+                    ))}
+                  </div>
+                  <div className="flex gap-2">
+                    <Button size="sm" onClick={() => onApprove(vacancy.id)}>
+                      <Icon name="Check" size={16} className="mr-1" />
+                      Одобрить
+                    </Button>
+                    <Button size="sm" variant="destructive" onClick={() => onReject(vacancy.id)}>
+                      <Icon name="X" size={16} className="mr-1" />
+                      Отклонить
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            ))
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
