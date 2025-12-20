@@ -42,7 +42,8 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     
     try:
         body = json.loads(event.get('body', '{}')) if method == 'POST' else {}
-        path = event.get('params', {}).get('path', '')
+        # Получаем путь из query параметров
+        path = event.get('queryStringParameters', {}).get('path', '') if event.get('queryStringParameters') else ''
         
         if method == 'POST' and 'create-payment' in path:
             return create_payment(body)
