@@ -106,6 +106,7 @@ export default function Index() {
   const [showBalanceDialog, setShowBalanceDialog] = useState(false);
   const [showVacancyDialog, setShowVacancyDialog] = useState(false);
   const [showAdminDialog, setShowAdminDialog] = useState(false);
+  const [showTierDialog, setShowTierDialog] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
 
@@ -392,6 +393,10 @@ export default function Index() {
           setShowProfileDialog(false);
           setShowBalanceDialog(true);
         }}
+        onSelectTier={() => {
+          setShowProfileDialog(false);
+          setShowTierDialog(true);
+        }}
       />
       <BalanceDialog open={showBalanceDialog} onClose={() => setShowBalanceDialog(false)} onAdd={handleAddBalance} />
       <VacancyDialog open={showVacancyDialog} onClose={() => setShowVacancyDialog(false)} onCreate={handleCreateVacancy} />
@@ -406,6 +411,25 @@ export default function Index() {
         onReject={(id) => {
           setVacancies(vacancies.map((v) => (v.id === id ? { ...v, status: 'rejected' } : v)));
           toast({ title: 'Объявление отклонено' });
+        }}
+      />
+      <TierDialog
+        open={showTierDialog}
+        onClose={() => setShowTierDialog(false)}
+        currentUser={currentUser}
+        onSelectTier={(tierName) => {
+          if (!currentUser) return;
+          const tier = TIERS.find((t) => t.name === tierName);
+          if (!tier) return;
+          
+          if (currentUser.balance < tier.price) {
+            toast({ title: 'Недостаточно средств', description: 'Пополните баланс', variant: 'destructive' });
+            return;
+          }
+          
+          setCurrentUser({ ...currentUser, tier: tierName as any, balance: currentUser.balance - tier.price });
+          setShowTierDialog(false);
+          toast({ title: 'Тариф изменен', description: `Теперь вы используете тариф ${tierName}` });
         }}
       />
     </div>
@@ -510,7 +534,7 @@ function AuthDialog({ open, onClose, onAuth }: { open: boolean; onClose: () => v
   );
 }
 
-function ProfileDialog({ open, onClose, user, onAddBalance }: { open: boolean; onClose: () => void; user: User | null; onAddBalance: () => void }) {
+function ProfileDialog({ open, onClose, user, onAddBalance, onSelectTier }: { open: boolean; onClose: () => void; user: User | null; onAddBalance: () => void; onSelectTier: () => void }) {
   if (!user) return null;
 
   return (
@@ -545,7 +569,12 @@ function ProfileDialog({ open, onClose, user, onAddBalance }: { open: boolean; o
                 </Button>
               </div>
               <div>
-                <Label>Тариф</Label>
+                <div className="flex items-center justify-between mb-2">
+                  <Label>Тариф</Label>
+                  <Button size="sm" variant="outline" onClick={onSelectTier}>
+                    Выбрать тариф
+                  </Button>
+                </div>
                 <p className="text-sm mt-1">
                   {user.tier} ({user.vacanciesThisMonth}/{TIERS.find((t) => t.name === user.tier)?.limit} объявлений)
                 </p>
@@ -726,6 +755,99 @@ function AdminDialog({
             ))
           )}
         </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function TierDialog({
+  open,
+  onClose,
+  currentUser,
+  onSelectTier,
+}: {
+  open: boolean;
+  onClose: () => void;
+  currentUser: User | null;
+  onSelectTier: (tierName: string) => void;
+}) {
+  return (
+    <Dialog open={open} onOpenChange={onClose}>
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Выберите тариф</DialogTitle>
+          <DialogDescription>Выберите подходящий тариф для размещения вакансий</DialogDescription>
+        </DialogHeader>
+        <div className="grid md:grid-cols-2 gap-4">
+          {TIERS.map((tier) => {
+            const isCurrentTier = currentUser?.tier === tier.name;
+            const canAfford = currentUser ? currentUser.balance >= tier.price : false;
+            
+            return (
+              <Card key={tier.name} className={isCurrentTier ? 'border-primary shadow-md' : ''}>
+                <CardHeader>
+                  <CardTitle className="flex items-center justify-between">
+                    <span>
+                      {tier.badge && <span className="mr-2">{tier.badge}</span>}
+                      {tier.name}
+                    </span>
+                    {isCurrentTier && <Badge variant="secondary">Текущий</Badge>}
+                  </CardTitle>
+                  <CardDescription className="text-2xl font-bold text-primary mt-2">
+                    {tier.price === 0 ? 'Бесплатно' : `${tier.price} ₽/мес`}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2 text-sm">
+                      <Icon name="Check" size={16} className="text-primary" />
+                      <span>До {tier.limit} объявлений в месяц</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-sm">
+                      <Icon name="Check" size={16} className="text-primary" />
+                      <span>Модерация в течение 24 часов</span>
+                    </div>
+                    {tier.name === 'VIP' && (
+                      <div className="flex items-center gap-2 text-sm">
+                        <Icon name="Check" size={16} className="text-primary" />
+                        <span>Значок VIP в объявлениях</span>
+                      </div>
+                    )}
+                    {tier.name === 'PREMIUM' && (
+                      <>
+                        <div className="flex items-center gap-2 text-sm">
+                          <Icon name="Check" size={16} className="text-primary" />
+                          <span>Значок PREMIUM в объявлениях</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-sm">
+                          <Icon name="Check" size={16} className="text-primary" />
+                          <span>Приоритетная модерация</span>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                  {!isCurrentTier && (
+                    <Button
+                      className="w-full"
+                      disabled={!canAfford && tier.price > 0}
+                      onClick={() => onSelectTier(tier.name)}
+                    >
+                      {!canAfford && tier.price > 0 ? 'Недостаточно средств' : 'Выбрать тариф'}
+                    </Button>
+                  )}
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
+        {currentUser && (
+          <div className="mt-4 p-3 bg-muted rounded-md">
+            <p className="text-sm text-muted-foreground">
+              <Icon name="Wallet" size={16} className="inline mr-1" />
+              Ваш баланс: <span className="font-semibold text-primary">{currentUser.balance} ₽</span>
+            </p>
+          </div>
+        )}
       </DialogContent>
     </Dialog>
   );
