@@ -140,10 +140,6 @@ export default function Index() {
         
         if (newVacancies.length > 0) {
           setVacancies(prev => [...prev, ...newVacancies]);
-          toast({
-            title: 'Вакансии обновлены',
-            description: `Загружено ${newVacancies.length} вакансий с Avito`
-          });
         }
       }
     } catch (error) {
@@ -441,19 +437,12 @@ export default function Index() {
                               {vacancy.city}
                             </CardDescription>
                           </div>
-                          <div className="flex flex-col items-end gap-1">
-                            {vacancy.source === 'avito' && (
-                              <Badge variant="outline" className="text-xs">
-                                Avito
-                              </Badge>
-                            )}
-                            {vacancy.employerTier !== 'FREE' && (
-                              <Badge variant="secondary">
-                                {TIERS.find((t) => t.name === vacancy.employerTier)?.badge}
-                                {vacancy.employerTier}
-                              </Badge>
-                            )}
-                          </div>
+                          {vacancy.employerTier !== 'FREE' && (
+                            <Badge variant="secondary">
+                              {TIERS.find((t) => t.name === vacancy.employerTier)?.badge}
+                              {vacancy.employerTier}
+                            </Badge>
+                          )}
                         </div>
                       </CardHeader>
                       <CardContent className="space-y-4 overflow-y-auto" style={{ maxHeight: 'calc(70vh - 120px)' }}>
@@ -577,19 +566,12 @@ function VacancyCard({ vacancy, currentUser, onAuthClick }: { vacancy: Vacancy; 
               {vacancy.city}
             </CardDescription>
           </div>
-          <div className="flex flex-col items-end gap-1">
-            {vacancy.source === 'avito' && (
-              <Badge variant="outline" className="text-xs">
-                Avito
-              </Badge>
-            )}
-            {vacancy.employerTier !== 'FREE' && (
-              <Badge variant="secondary">
-                {TIERS.find((t) => t.name === vacancy.employerTier)?.badge}
-                {vacancy.employerTier}
-              </Badge>
-            )}
-          </div>
+          {vacancy.employerTier !== 'FREE' && (
+            <Badge variant="secondary">
+              {TIERS.find((t) => t.name === vacancy.employerTier)?.badge}
+              {vacancy.employerTier}
+            </Badge>
+          )}
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
