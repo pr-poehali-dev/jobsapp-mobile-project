@@ -138,9 +138,9 @@ export default function Index() {
     if (!isDragging.current) return;
     
     const currentY = e.touches[0].clientY;
-    const diff = touchStartY.current - currentY;
+    const diff = currentY - touchStartY.current;
     
-    setSwipeOffset(-diff);
+    setSwipeOffset(diff);
   };
 
   const handleTouchEnd = () => {
@@ -148,9 +148,9 @@ export default function Index() {
     
     const swipeThreshold = 80;
 
-    if (swipeOffset > swipeThreshold) {
+    if (swipeOffset < -swipeThreshold) {
       handleSwipeNext();
-    } else if (swipeOffset < -swipeThreshold) {
+    } else if (swipeOffset > swipeThreshold) {
       handleSwipePrev();
     }
     
