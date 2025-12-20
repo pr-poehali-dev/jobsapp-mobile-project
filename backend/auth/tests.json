@@ -1,0 +1,36 @@
+{
+  "tests": [
+    {
+      "name": "Регистрация с email",
+      "method": "POST",
+      "path": "register",
+      "body": {
+        "name": "Тестовый Пользователь",
+        "email": "test@example.com",
+        "password": "password123",
+        "role": "seeker",
+        "verification_type": "email"
+      },
+      "expectedStatus": 201,
+      "expectedBody": {
+        "success": true,
+        "user_id": "string"
+      },
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "Вход пользователя",
+      "method": "POST",
+      "path": "login",
+      "body": {
+        "login": "test@example.com",
+        "password": "password123"
+      },
+      "expectedStatus": 200,
+      "expectedBody": {
+        "success": true
+      },
+      "bodyMatcher": "partial"
+    }
+  ]
+}

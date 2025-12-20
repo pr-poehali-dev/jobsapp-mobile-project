@@ -11,6 +11,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from '@/hooks/use-toast';
+import AuthSystem from '@/components/auth/AuthSystem';
+import PaymentDialog from '@/components/payment/PaymentDialog';
 
 type UserRole = 'guest' | 'seeker' | 'employer' | 'admin';
 
@@ -32,8 +34,8 @@ type Vacancy = {
 type User = {
   id: string;
   name: string;
-  email: string;
-  phone: string;
+  email: string | null;
+  phone: string | null;
   role: UserRole;
   balance: number;
   tier: 'FREE' | 'ECONOM' | 'VIP' | 'PREMIUM';
@@ -95,8 +97,6 @@ const MOCK_VACANCIES: Vacancy[] = [
   },
 ];
 
-const ADMIN_PHONE = '+79992255109';
-const ADMIN_PASSWORD = '23112311!!';
 const AVITO_SYNC_URL = 'https://functions.poehali.dev/300cf95d-737b-4557-81c3-01bccd37f7a4';
 
 export default function Index() {
@@ -196,52 +196,7 @@ export default function Index() {
     setSwipeOffset(0);
   };
 
-  const handleAuth = (role: 'seeker' | 'employer', data: any) => {
-    if (role === 'employer' && data.phone === ADMIN_PHONE && data.password === ADMIN_PASSWORD) {
-      setCurrentUser({
-        id: 'admin',
-        name: 'Администратор',
-        email: 'admin@jobs-app.ru',
-        phone: ADMIN_PHONE,
-        role: 'admin',
-        balance: 0,
-        tier: 'PREMIUM',
-        vacanciesThisMonth: 0,
-      });
-      setShowAuthDialog(false);
-      setShowAdminDialog(true);
-      toast({ title: 'Вход выполнен', description: 'Добро пожаловать, Администратор!' });
-      return;
-    }
 
-    const newUser: User = {
-      id: Date.now().toString(),
-      name: data.name || 'Пользователь',
-      email: data.email || '',
-      phone: data.phone || '',
-      role: role,
-      balance: role === 'employer' ? 30 : 0,
-      tier: 'FREE',
-      vacanciesThisMonth: 0,
-    };
-
-    setCurrentUser(newUser);
-    setShowAuthDialog(false);
-
-    if (role === 'employer') {
-      toast({
-        title: 'Регистрация успешна!',
-        description: '🎁 На вашем счету 30 ₽. Пополните баланс на 200 ₽ для быстрого старта!',
-        action: (
-          <Button size="sm" onClick={() => setShowBalanceDialog(true)}>
-            Пополнить
-          </Button>
-        ),
-      });
-    } else {
-      toast({ title: 'Вход выполнен', description: 'Теперь вы можете просматривать контакты работодателей' });
-    }
-  };
 
   const handleAddBalance = (amount: number) => {
     if (currentUser) {
@@ -515,7 +470,7 @@ export default function Index() {
         </div>
       </footer>
 
-      <AuthDialog open={showAuthDialog} onClose={() => setShowAuthDialog(false)} onAuth={handleAuth} />
+      <AuthSystem open={showAuthDialog} onClose={() => setShowAuthDialog(false)} onSuccess={(user) => setCurrentUser(user)} />
       <ProfileDialog
         open={showProfileDialog}
         onClose={() => setShowProfileDialog(false)}
@@ -533,7 +488,7 @@ export default function Index() {
           setShowVacancyDialog(true);
         } : undefined}
       />
-      <BalanceDialog open={showBalanceDialog} onClose={() => setShowBalanceDialog(false)} onAdd={handleAddBalance} />
+      <PaymentDialog open={showBalanceDialog} onClose={() => setShowBalanceDialog(false)} userId={currentUser?.id || ''} />
       <VacancyDialog open={showVacancyDialog} onClose={() => setShowVacancyDialog(false)} onCreate={handleCreateVacancy} />
       <AdminDialog
         open={showAdminDialog}
@@ -632,43 +587,6 @@ function VacancyCard({ vacancy, currentUser, onAuthClick }: { vacancy: Vacancy; 
   );
 }
 
-function AuthDialog({ open, onClose, onAuth }: { open: boolean; onClose: () => void; onAuth: (role: 'seeker' | 'employer', data: any) => void }) {
-  const [authData, setAuthData] = useState({ name: '', phone: '', email: '', password: '' });
-
-  return (
-    <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Вход или регистрация</DialogTitle>
-          <DialogDescription>Выберите роль и заполните данные</DialogDescription>
-        </DialogHeader>
-        <Tabs defaultValue="seeker">
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="seeker">Соискатель</TabsTrigger>
-            <TabsTrigger value="employer">Работодатель</TabsTrigger>
-          </TabsList>
-          <TabsContent value="seeker" className="space-y-3">
-            <Input placeholder="Имя" value={authData.name} onChange={(e) => setAuthData({ ...authData, name: e.target.value })} />
-            <Input placeholder="Email" type="email" value={authData.email} onChange={(e) => setAuthData({ ...authData, email: e.target.value })} />
-            <Button className="w-full" onClick={() => onAuth('seeker', authData)}>
-              Войти как соискатель
-            </Button>
-          </TabsContent>
-          <TabsContent value="employer" className="space-y-3">
-            <Input placeholder="Имя или название компании" value={authData.name} onChange={(e) => setAuthData({ ...authData, name: e.target.value })} />
-            <Input placeholder="Телефон" value={authData.phone} onChange={(e) => setAuthData({ ...authData, phone: e.target.value })} />
-            <Input placeholder="Email" type="email" value={authData.email} onChange={(e) => setAuthData({ ...authData, email: e.target.value })} />
-            <Input placeholder="Пароль" type="password" value={authData.password} onChange={(e) => setAuthData({ ...authData, password: e.target.value })} />
-            <Button className="w-full" onClick={() => onAuth('employer', authData)}>
-              Войти как работодатель
-            </Button>
-          </TabsContent>
-        </Tabs>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
 function ProfileDialog({ open, onClose, user, onAddBalance, onSelectTier, onCreateVacancy }: { open: boolean; onClose: () => void; user: User | null; onAddBalance: () => void; onSelectTier: () => void; onCreateVacancy?: () => void }) {
   if (!user) return null;
 
@@ -722,74 +640,6 @@ function ProfileDialog({ open, onClose, user, onAddBalance, onSelectTier, onCrea
               )}
             </>
           )}
-        </div>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-function BalanceDialog({ open, onClose, onAdd }: { open: boolean; onClose: () => void; onAdd: (amount: number) => void }) {
-  const [amount, setAmount] = useState('200');
-
-  return (
-    <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Пополнение баланса</DialogTitle>
-          <DialogDescription>Введите сумму для пополнения</DialogDescription>
-        </DialogHeader>
-        <div className="space-y-4">
-          <Input type="number" placeholder="Сумма" value={amount} onChange={(e) => setAmount(e.target.value)} />
-          <div className="grid grid-cols-3 gap-2">
-            {[200, 500, 1000].map((preset) => (
-              <Button key={preset} variant="outline" size="sm" onClick={() => setAmount(preset.toString())}>
-                {preset} ₽
-              </Button>
-            ))}
-          </div>
-          <div className="space-y-3">
-            <Button
-              className="w-full flex items-center justify-center gap-2"
-              onClick={() => {
-                const num = parseInt(amount);
-                if (num > 0) {
-                  onAdd(num);
-                  toast({ title: 'СБП', description: 'Переход на оплату через СБП' });
-                }
-              }}
-            >
-              <Icon name="Smartphone" size={18} />
-              Пополнить через СБП
-            </Button>
-            <Button
-              className="w-full flex items-center justify-center gap-2"
-              variant="outline"
-              onClick={() => {
-                const num = parseInt(amount);
-                if (num > 0) {
-                  onAdd(num);
-                  toast({ title: 'Банковская карта', description: 'Переход на оплату картой' });
-                }
-              }}
-            >
-              <Icon name="CreditCard" size={18} />
-              Пополнить банковской картой
-            </Button>
-            <Button
-              className="w-full flex items-center justify-center gap-2"
-              variant="outline"
-              onClick={() => {
-                const num = parseInt(amount);
-                if (num > 0) {
-                  onAdd(num);
-                  toast({ title: 'ЮMoney', description: 'Переход на оплату через ЮMoney' });
-                }
-              }}
-            >
-              <Icon name="Wallet" size={18} />
-              Пополнить через ЮMoney
-            </Button>
-          </div>
         </div>
       </DialogContent>
     </Dialog>

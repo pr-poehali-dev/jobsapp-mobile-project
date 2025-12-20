@@ -1,0 +1,20 @@
+{
+  "tests": [
+    {
+      "name": "Создание платежа",
+      "method": "POST",
+      "path": "create-payment",
+      "body": {
+        "user_id": "test-user-id",
+        "amount": 500,
+        "payment_system": "yoomoney"
+      },
+      "expectedStatus": 200,
+      "expectedBody": {
+        "success": true,
+        "payment_url": "string"
+      },
+      "bodyMatcher": "partial"
+    }
+  ]
+}
