@@ -319,17 +319,30 @@ export default function Index() {
               ) : (
                 <>
                   {currentUser.role === 'employer' && (
-                    <Button size="sm" onClick={() => setShowVacancyDialog(true)}>
+                    <Button size="sm" onClick={() => setShowVacancyDialog(true)} className="hidden md:flex">
                       Разместить вакансию
                     </Button>
                   )}
-                  <Button size="sm" variant="outline" onClick={() => setShowProfileDialog(true)}>
+                  <Button 
+                    size="sm" 
+                    variant="outline" 
+                    onClick={() => setShowProfileDialog(true)}
+                    className="hidden md:flex"
+                  >
                     {currentUser.name}
                     {currentUser.role === 'employer' && (
                       <Badge variant="secondary" className="ml-2">
                         {currentUser.balance} ₽
                       </Badge>
                     )}
+                  </Button>
+                  <Button 
+                    size="icon" 
+                    variant="outline" 
+                    onClick={() => setShowProfileDialog(true)}
+                    className="md:hidden rounded-full h-10 w-10"
+                  >
+                    <Icon name="User" size={20} />
                   </Button>
                 </>
               )
@@ -515,6 +528,10 @@ export default function Index() {
           setShowProfileDialog(false);
           setShowTierDialog(true);
         }}
+        onCreateVacancy={currentUser?.role === 'employer' ? () => {
+          setShowProfileDialog(false);
+          setShowVacancyDialog(true);
+        } : undefined}
       />
       <BalanceDialog open={showBalanceDialog} onClose={() => setShowBalanceDialog(false)} onAdd={handleAddBalance} />
       <VacancyDialog open={showVacancyDialog} onClose={() => setShowVacancyDialog(false)} onCreate={handleCreateVacancy} />
@@ -652,7 +669,7 @@ function AuthDialog({ open, onClose, onAuth }: { open: boolean; onClose: () => v
   );
 }
 
-function ProfileDialog({ open, onClose, user, onAddBalance, onSelectTier }: { open: boolean; onClose: () => void; user: User | null; onAddBalance: () => void; onSelectTier: () => void }) {
+function ProfileDialog({ open, onClose, user, onAddBalance, onSelectTier, onCreateVacancy }: { open: boolean; onClose: () => void; user: User | null; onAddBalance: () => void; onSelectTier: () => void; onCreateVacancy?: () => void }) {
   if (!user) return null;
 
   return (
@@ -697,6 +714,12 @@ function ProfileDialog({ open, onClose, user, onAddBalance, onSelectTier }: { op
                   {user.tier} ({user.vacanciesThisMonth}/{TIERS.find((t) => t.name === user.tier)?.limit} объявлений)
                 </p>
               </div>
+              {onCreateVacancy && (
+                <Button className="w-full md:hidden" onClick={onCreateVacancy}>
+                  <Icon name="Plus" size={16} className="mr-2" />
+                  Разместить вакансию
+                </Button>
+              )}
             </>
           )}
         </div>
@@ -724,17 +747,49 @@ function BalanceDialog({ open, onClose, onAdd }: { open: boolean; onClose: () =>
               </Button>
             ))}
           </div>
-          <Button
-            className="w-full"
-            onClick={() => {
-              const num = parseInt(amount);
-              if (num > 0) {
-                onAdd(num);
-              }
-            }}
-          >
-            Пополнить через ЮMoney
-          </Button>
+          <div className="space-y-3">
+            <Button
+              className="w-full flex items-center justify-center gap-2"
+              onClick={() => {
+                const num = parseInt(amount);
+                if (num > 0) {
+                  onAdd(num);
+                  toast({ title: 'СБП', description: 'Переход на оплату через СБП' });
+                }
+              }}
+            >
+              <Icon name="Smartphone" size={18} />
+              Пополнить через СБП
+            </Button>
+            <Button
+              className="w-full flex items-center justify-center gap-2"
+              variant="outline"
+              onClick={() => {
+                const num = parseInt(amount);
+                if (num > 0) {
+                  onAdd(num);
+                  toast({ title: 'Банковская карта', description: 'Переход на оплату картой' });
+                }
+              }}
+            >
+              <Icon name="CreditCard" size={18} />
+              Пополнить банковской картой
+            </Button>
+            <Button
+              className="w-full flex items-center justify-center gap-2"
+              variant="outline"
+              onClick={() => {
+                const num = parseInt(amount);
+                if (num > 0) {
+                  onAdd(num);
+                  toast({ title: 'ЮMoney', description: 'Переход на оплату через ЮMoney' });
+                }
+              }}
+            >
+              <Icon name="Wallet" size={18} />
+              Пополнить через ЮMoney
+            </Button>
+          </div>
         </div>
       </DialogContent>
     </Dialog>
