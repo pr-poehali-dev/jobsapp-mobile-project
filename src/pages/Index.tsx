@@ -295,7 +295,7 @@ export default function Index() {
                     size="icon" 
                     variant="outline" 
                     onClick={() => setShowProfileDialog(true)}
-                    className="md:hidden rounded-full h-10 w-10"
+                    className="md:hidden rounded-full h-10 w-10 bg-white text-gray-900 border-gray-300 hover:bg-gray-50"
                   >
                     <Icon name="User" size={20} />
                   </Button>
