@@ -110,7 +110,8 @@ export default function Index() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const touchStartY = useRef<number>(0);
-  const touchEndY = useRef<number>(0);
+  const isDragging = useRef<boolean>(false);
+  const [swipeOffset, setSwipeOffset] = useState(0);
 
   const handleSwipeNext = () => {
     if (currentVacancyIndex < filteredVacancies.length - 1) {
@@ -130,23 +131,31 @@ export default function Index() {
 
   const handleTouchStart = (e: React.TouchEvent) => {
     touchStartY.current = e.touches[0].clientY;
+    isDragging.current = true;
   };
 
   const handleTouchMove = (e: React.TouchEvent) => {
-    touchEndY.current = e.touches[0].clientY;
+    if (!isDragging.current) return;
+    
+    const currentY = e.touches[0].clientY;
+    const diff = touchStartY.current - currentY;
+    
+    setSwipeOffset(-diff);
   };
 
   const handleTouchEnd = () => {
-    const swipeDistance = touchStartY.current - touchEndY.current;
-    const minSwipeDistance = 50;
+    if (!isDragging.current) return;
+    
+    const swipeThreshold = 80;
 
-    if (Math.abs(swipeDistance) > minSwipeDistance) {
-      if (swipeDistance > 0) {
-        handleSwipeNext();
-      } else {
-        handleSwipePrev();
-      }
+    if (swipeOffset > swipeThreshold) {
+      handleSwipeNext();
+    } else if (swipeOffset < -swipeThreshold) {
+      handleSwipePrev();
     }
+    
+    isDragging.current = false;
+    setSwipeOffset(0);
   };
 
   const handleAuth = (role: 'seeker' | 'employer', data: any) => {
@@ -342,10 +351,14 @@ export default function Index() {
                 ))}
               </div>
 
-              <div className="md:hidden flex items-center justify-center min-h-[400px]">
+              <div className="md:hidden flex items-center justify-center min-h-[400px] relative overflow-hidden">
                 {currentVacancy && (
                   <Card 
-                    className="w-full max-w-md swipe-card animate-fade-in" 
+                    className="w-full max-w-md swipe-card" 
+                    style={{
+                      transform: `translateY(${swipeOffset}px)`,
+                      transition: isDragging.current ? 'none' : 'transform 0.3s ease-out',
+                    }}
                     onTouchStart={handleTouchStart}
                     onTouchMove={handleTouchMove}
                     onTouchEnd={handleTouchEnd}
