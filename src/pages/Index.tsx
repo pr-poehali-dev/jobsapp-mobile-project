@@ -11,8 +11,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from '@/hooks/use-toast';
-import AuthSystem from '@/components/auth/AuthSystem';
-import PaymentDialog from '@/components/payment/PaymentDialog';
+import { AuthSystem } from '@/components/AuthSystem';
+import { PaymentDialog } from '@/components/PaymentDialog';
 
 type UserRole = 'guest' | 'seeker' | 'employer' | 'admin';
 
