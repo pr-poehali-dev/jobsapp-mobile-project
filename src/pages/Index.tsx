@@ -282,11 +282,11 @@ export default function Index() {
                     size="sm" 
                     variant="outline" 
                     onClick={() => setShowProfileDialog(true)}
-                    className="hidden md:flex"
+                    className="hidden md:flex bg-white text-gray-900 border-gray-300 hover:bg-gray-50"
                   >
                     {currentUser.name}
                     {currentUser.role === 'employer' && (
-                      <Badge variant="secondary" className="ml-2">
+                      <Badge variant="secondary" className="ml-2 bg-blue-100 text-blue-900">
                         {currentUser.balance} ₽
                       </Badge>
                     )}
