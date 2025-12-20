@@ -4,7 +4,8 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -81,6 +82,8 @@ export default function Admin() {
   const [searchQuery, setSearchQuery] = useState('');
   const [userSearchQuery, setUserSearchQuery] = useState('');
   const [usersLoading, setUsersLoading] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [userToDelete, setUserToDelete] = useState<User | null>(null);
 
   useEffect(() => {
     checkAuth();
@@ -271,6 +274,36 @@ export default function Admin() {
       toast({
         title: 'Ошибка',
         description: error.message || 'Не удалось изменить тариф',
+        variant: 'destructive'
+      });
+    }
+  };
+
+  const deleteUser = async (userId: string) => {
+    try {
+      const response = await fetch(`${ADMIN_API}?path=users`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: userId })
+      });
+      const data = await response.json();
+      if (data.success) {
+        toast({
+          title: 'Успешно',
+          description: 'Пользователь удален'
+        });
+        setShowDeleteDialog(false);
+        setShowUserDialog(false);
+        setUserToDelete(null);
+        loadUsers();
+        loadStats();
+      } else {
+        throw new Error(data.error);
+      }
+    } catch (error: any) {
+      toast({
+        title: 'Ошибка',
+        description: error.message || 'Не удалось удалить пользователя',
         variant: 'destructive'
       });
     }
@@ -856,10 +889,54 @@ export default function Admin() {
                   </Button>
                 </div>
               </div>
+              <div className="pt-4 border-t">
+                <Button
+                  variant="destructive"
+                  className="w-full"
+                  onClick={() => {
+                    setUserToDelete(selectedUser);
+                    setShowDeleteDialog(true);
+                  }}
+                >
+                  <Icon name="Trash2" size={16} className="mr-2" />
+                  Удалить пользователя
+                </Button>
+              </div>
             </div>
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Диалог подтверждения удаления */}
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Удалить пользователя?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Вы собираетесь удалить пользователя <strong>{userToDelete?.name}</strong>.
+              <br /><br />
+              Будут удалены:
+              <ul className="list-disc list-inside mt-2">
+                <li>Профиль пользователя</li>
+                <li>Все вакансии пользователя</li>
+                <li>История транзакций</li>
+                <li>Коды верификации</li>
+              </ul>
+              <br />
+              <strong className="text-destructive">Это действие нельзя отменить!</strong>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Отмена</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => userToDelete && deleteUser(userToDelete.id)}
+            >
+              Удалить безвозвратно
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

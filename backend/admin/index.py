@@ -36,6 +36,8 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 return get_user(params, conn)
             elif method == 'PUT':
                 return update_user(event, conn, context)
+            elif method == 'DELETE':
+                return delete_user(event, conn)
         elif path == 'vacancies':
             if method == 'GET':
                 return get_vacancies(params, conn)
@@ -168,6 +170,51 @@ def update_user(event: Dict[str, Any], conn, context: Any) -> Dict[str, Any]:
                 'success': True,
                 'user': dict(user)
             }, default=str),
+            'isBase64Encoded': False
+        }
+
+
+def delete_user(event: Dict[str, Any], conn) -> Dict[str, Any]:
+    """Удаляет пользователя и все его данные"""
+    body_str = event.get('body', '{}') or '{}'
+    body = json.loads(body_str)
+    user_id = body.get('user_id')
+    
+    if not user_id:
+        return error_response(400, 'user_id required')
+    
+    with conn.cursor(cursor_factory=RealDictCursor) as cur:
+        # Проверяем существование пользователя
+        cur.execute('SELECT id, name FROM users WHERE id = %s', (user_id,))
+        user = cur.fetchone()
+        
+        if not user:
+            return error_response(404, 'User not found')
+        
+        # Удаляем данные пользователя (каскадное удаление через ON DELETE CASCADE)
+        # Порядок важен из-за внешних ключей
+        
+        # 1. Удаляем коды верификации
+        cur.execute('DELETE FROM verification_codes WHERE user_id = %s', (user_id,))
+        
+        # 2. Удаляем транзакции
+        cur.execute('DELETE FROM transactions WHERE user_id = %s', (user_id,))
+        
+        # 3. Удаляем вакансии
+        cur.execute('DELETE FROM vacancies WHERE user_id = %s', (user_id,))
+        
+        # 4. Удаляем самого пользователя
+        cur.execute('DELETE FROM users WHERE id = %s', (user_id,))
+        
+        conn.commit()
+        
+        return {
+            'statusCode': 200,
+            'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
+            'body': json.dumps({
+                'success': True,
+                'message': f'Пользователь {user["name"]} успешно удален'
+            }),
             'isBase64Encoded': False
         }
 
