@@ -137,6 +137,8 @@ export default function Index() {
   const handleTouchMove = (e: React.TouchEvent) => {
     if (!isDragging.current) return;
     
+    e.preventDefault();
+    
     const currentY = e.touches[0].clientY;
     const diff = currentY - touchStartY.current;
     
@@ -351,10 +353,10 @@ export default function Index() {
                 ))}
               </div>
 
-              <div className="md:hidden flex items-center justify-center min-h-[400px] relative overflow-hidden">
+              <div className="md:hidden flex items-center justify-center min-h-[400px] relative overflow-hidden touch-none">
                 {currentVacancy && (
                   <Card 
-                    className="w-full max-w-md swipe-card" 
+                    className="w-full max-w-md swipe-card touch-none" 
                     style={{
                       transform: `translateY(${swipeOffset}px)`,
                       transition: isDragging.current ? 'none' : 'transform 0.3s ease-out',
