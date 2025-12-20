@@ -1,11 +1,10 @@
 import { useState } from 'react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from '@/hooks/use-toast';
-import Icon from '@/components/ui/icon';
+import { LoginForm } from './auth/LoginForm';
+import { RegisterForm } from './auth/RegisterForm';
+import { VerifyForm } from './auth/VerifyForm';
+import { ResetPasswordForm, ConfirmResetForm } from './auth/PasswordResetForms';
 
 const AUTH_API_URL = 'https://functions.poehali.dev/b3919417-c4e8-496a-982f-500d5754d530';
 
@@ -35,7 +34,6 @@ export function AuthSystem({ open, onClose, onSuccess }: AuthSystemProps) {
   const [role, setRole] = useState<'seeker' | 'employer'>('seeker');
   const [verificationType, setVerificationType] = useState<'email' | 'sms'>('email');
   
-  // Форма данных
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -290,235 +288,61 @@ export function AuthSystem({ open, onClose, onSuccess }: AuthSystemProps) {
           </DialogDescription>
         </DialogHeader>
 
-        {/* ВХОД */}
         {mode === 'login' && (
-          <div className="space-y-4">
-            <div>
-              <Label>Email или телефон</Label>
-              <Input
-                type="text"
-                placeholder="example@mail.ru или +79991234567"
-                value={formData.email || formData.phone}
-                onChange={(e) => setFormData({ ...formData, email: e.target.value, phone: e.target.value })}
-              />
-            </div>
-            <div>
-              <Label>Пароль</Label>
-              <Input
-                type="password"
-                placeholder="Введите пароль"
-                value={formData.password}
-                onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-              />
-            </div>
-            <Button className="w-full" onClick={handleLogin} disabled={loading}>
-              {loading ? 'Загрузка...' : 'Войти'}
-            </Button>
-            <div className="flex flex-col gap-2 text-sm text-center">
-              <button
-                type="button"
-                className="text-primary hover:underline"
-                onClick={() => { setMode('register'); resetForm(); }}
-              >
-                Нет аккаунта? Зарегистрироваться
-              </button>
-              <button
-                type="button"
-                className="text-muted-foreground hover:underline"
-                onClick={() => { setMode('reset'); resetForm(); }}
-              >
-                Забыли пароль?
-              </button>
-            </div>
-          </div>
+          <LoginForm
+            formData={formData}
+            setFormData={setFormData}
+            onLogin={handleLogin}
+            onSwitchToRegister={() => { setMode('register'); resetForm(); }}
+            onSwitchToReset={() => { setMode('reset'); resetForm(); }}
+            loading={loading}
+          />
         )}
 
-        {/* РЕГИСТРАЦИЯ */}
         {mode === 'register' && (
-          <div className="space-y-4">
-            <Tabs defaultValue="seeker" onValueChange={(v) => setRole(v as 'seeker' | 'employer')}>
-              <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="seeker">Соискатель</TabsTrigger>
-                <TabsTrigger value="employer">Работодатель</TabsTrigger>
-              </TabsList>
-            </Tabs>
-
-            <div>
-              <Label>Имя или название компании</Label>
-              <Input
-                placeholder="Иван Иванов"
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              />
-            </div>
-
-            <div>
-              <Label>Способ подтверждения</Label>
-              <Tabs defaultValue="email" onValueChange={(v) => setVerificationType(v as 'email' | 'sms')}>
-                <TabsList className="grid w-full grid-cols-2">
-                  <TabsTrigger value="email">Email</TabsTrigger>
-                  <TabsTrigger value="sms">SMS</TabsTrigger>
-                </TabsList>
-              </Tabs>
-            </div>
-
-            {verificationType === 'email' ? (
-              <div>
-                <Label>Email</Label>
-                <Input
-                  type="email"
-                  placeholder="example@mail.ru"
-                  value={formData.email}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                />
-              </div>
-            ) : (
-              <div>
-                <Label>Телефон</Label>
-                <Input
-                  type="tel"
-                  placeholder="+79991234567"
-                  value={formData.phone}
-                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                />
-              </div>
-            )}
-
-            <div>
-              <Label>Пароль (минимум 6 символов)</Label>
-              <Input
-                type="password"
-                placeholder="Придумайте пароль"
-                value={formData.password}
-                onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-              />
-            </div>
-
-            <Button className="w-full" onClick={handleRegister} disabled={loading}>
-              {loading ? 'Загрузка...' : 'Зарегистрироваться'}
-            </Button>
-
-            <div className="text-sm text-center">
-              <button
-                type="button"
-                className="text-primary hover:underline"
-                onClick={() => { setMode('login'); resetForm(); }}
-              >
-                Уже есть аккаунт? Войти
-              </button>
-            </div>
-          </div>
+          <RegisterForm
+            formData={formData}
+            setFormData={setFormData}
+            role={role}
+            setRole={setRole}
+            verificationType={verificationType}
+            setVerificationType={setVerificationType}
+            onRegister={handleRegister}
+            onSwitchToLogin={() => { setMode('login'); resetForm(); }}
+            loading={loading}
+          />
         )}
 
-        {/* ПОДТВЕРЖДЕНИЕ КОДА */}
         {mode === 'verify' && (
-          <div className="space-y-4">
-            <div className="text-center">
-              <Icon name="Mail" size={48} className="mx-auto mb-4 text-primary" />
-              <p className="text-sm text-muted-foreground">
-                Код отправлен на {verificationType === 'email' ? formData.email : formData.phone}
-              </p>
-            </div>
-            <div>
-              <Label>Код подтверждения</Label>
-              <Input
-                placeholder="123456"
-                maxLength={6}
-                value={formData.code}
-                onChange={(e) => setFormData({ ...formData, code: e.target.value.replace(/\D/g, '') })}
-              />
-            </div>
-            <Button className="w-full" onClick={handleVerify} disabled={loading}>
-              {loading ? 'Проверка...' : 'Подтвердить'}
-            </Button>
-            <div className="text-sm text-center">
-              <button
-                type="button"
-                className="text-muted-foreground hover:underline"
-                onClick={() => { setMode('register'); resetForm(); }}
-              >
-                Назад к регистрации
-              </button>
-            </div>
-          </div>
+          <VerifyForm
+            formData={formData}
+            setFormData={setFormData}
+            verificationType={verificationType}
+            onVerify={handleVerify}
+            onSwitchToRegister={() => { setMode('register'); resetForm(); }}
+            loading={loading}
+          />
         )}
 
-        {/* ВОССТАНОВЛЕНИЕ ПАРОЛЯ */}
         {mode === 'reset' && (
-          <div className="space-y-4">
-            <div>
-              <Label>Способ восстановления</Label>
-              <Tabs defaultValue="email" onValueChange={(v) => setVerificationType(v as 'email' | 'sms')}>
-                <TabsList className="grid w-full grid-cols-2">
-                  <TabsTrigger value="email">Email</TabsTrigger>
-                  <TabsTrigger value="sms">SMS</TabsTrigger>
-                </TabsList>
-              </Tabs>
-            </div>
-
-            {verificationType === 'email' ? (
-              <div>
-                <Label>Email</Label>
-                <Input
-                  type="email"
-                  placeholder="example@mail.ru"
-                  value={formData.email}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                />
-              </div>
-            ) : (
-              <div>
-                <Label>Телефон</Label>
-                <Input
-                  type="tel"
-                  placeholder="+79991234567"
-                  value={formData.phone}
-                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                />
-              </div>
-            )}
-
-            <Button className="w-full" onClick={handleResetPassword} disabled={loading}>
-              {loading ? 'Отправка...' : 'Отправить код'}
-            </Button>
-
-            <div className="text-sm text-center">
-              <button
-                type="button"
-                className="text-primary hover:underline"
-                onClick={() => { setMode('login'); resetForm(); }}
-              >
-                Вернуться ко входу
-              </button>
-            </div>
-          </div>
+          <ResetPasswordForm
+            formData={formData}
+            setFormData={setFormData}
+            verificationType={verificationType}
+            setVerificationType={setVerificationType}
+            onResetPassword={handleResetPassword}
+            onSwitchToLogin={() => { setMode('login'); resetForm(); }}
+            loading={loading}
+          />
         )}
 
-        {/* ПОДТВЕРЖДЕНИЕ СБРОСА ПАРОЛЯ */}
         {mode === 'confirm-reset' && (
-          <div className="space-y-4">
-            <div>
-              <Label>Код из SMS/Email</Label>
-              <Input
-                placeholder="123456"
-                maxLength={6}
-                value={formData.code}
-                onChange={(e) => setFormData({ ...formData, code: e.target.value.replace(/\D/g, '') })}
-              />
-            </div>
-            <div>
-              <Label>Новый пароль (минимум 6 символов)</Label>
-              <Input
-                type="password"
-                placeholder="Введите новый пароль"
-                value={formData.newPassword}
-                onChange={(e) => setFormData({ ...formData, newPassword: e.target.value })}
-              />
-            </div>
-            <Button className="w-full" onClick={handleConfirmReset} disabled={loading}>
-              {loading ? 'Сохранение...' : 'Изменить пароль'}
-            </Button>
-          </div>
+          <ConfirmResetForm
+            formData={formData}
+            setFormData={setFormData}
+            onConfirmReset={handleConfirmReset}
+            loading={loading}
+          />
         )}
       </DialogContent>
     </Dialog>
