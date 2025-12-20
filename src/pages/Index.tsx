@@ -121,6 +121,23 @@ export default function Index() {
   const isDragging = useRef<boolean>(false);
   const [swipeOffset, setSwipeOffset] = useState(0);
 
+  // Загрузка сохраненного города из localStorage
+  useEffect(() => {
+    const savedCity = localStorage.getItem('selectedCity');
+    if (savedCity) {
+      setSelectedCity(savedCity);
+    }
+  }, []);
+
+  // Сохранение выбранного города в localStorage
+  useEffect(() => {
+    if (selectedCity) {
+      localStorage.setItem('selectedCity', selectedCity);
+    } else {
+      localStorage.removeItem('selectedCity');
+    }
+  }, [selectedCity]);
+
   // Загрузка вакансий с Avito при монтировании компонента
   useEffect(() => {
     loadAvitoVacancies();
