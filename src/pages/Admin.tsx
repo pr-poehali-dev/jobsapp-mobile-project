@@ -13,6 +13,7 @@ import { toast } from '@/hooks/use-toast';
 import { useNavigate } from 'react-router-dom';
 
 const ADMIN_API = 'https://functions.poehali.dev/0d65638b-a8d6-40af-971b-31d0f9e356d0';
+const AUTH_API = 'https://functions.poehali.dev/b3919417-c4e8-496a-982f-500d5754d530';
 
 type User = {
   id: string;
@@ -64,6 +65,11 @@ type Stats = {
 
 export default function Admin() {
   const navigate = useNavigate();
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [loginForm, setLoginForm] = useState({ login: '', password: '' });
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [stats, setStats] = useState<Stats | null>(null);
   const [users, setUsers] = useState<User[]>([]);
   const [vacancies, setVacancies] = useState<Vacancy[]>([]);
@@ -75,9 +81,92 @@ export default function Admin() {
   const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
-    loadStats();
-    loadVacancies('pending');
+    checkAuth();
   }, []);
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      loadStats();
+      loadVacancies('pending');
+    }
+  }, [isAuthenticated]);
+
+  const checkAuth = () => {
+    const savedUser = localStorage.getItem('adminUser');
+    if (savedUser) {
+      const user = JSON.parse(savedUser);
+      if (
+        (user.phone === '+79992255109' || user.email === 'ad.alex1995@yandex.ru') &&
+        user.role === 'admin'
+      ) {
+        setCurrentUser(user);
+        setIsAuthenticated(true);
+      } else {
+        localStorage.removeItem('adminUser');
+      }
+    }
+    setIsCheckingAuth(false);
+  };
+
+  const handleLogin = async () => {
+    setIsLoggingIn(true);
+    try {
+      const response = await fetch(`${AUTH_API}?path=login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          login: loginForm.login,
+          password: loginForm.password
+        })
+      });
+
+      const data = await response.json();
+
+      if (response.ok && data.success) {
+        const user = data.user;
+        
+        if (
+          (user.phone === '+79992255109' || user.email === 'ad.alex1995@yandex.ru') &&
+          user.role === 'admin'
+        ) {
+          localStorage.setItem('adminUser', JSON.stringify(user));
+          setCurrentUser(user);
+          setIsAuthenticated(true);
+          toast({
+            title: 'Доступ разрешен',
+            description: 'Добро пожаловать в админ-панель'
+          });
+        } else {
+          toast({
+            title: 'Доступ запрещен',
+            description: 'У вас нет прав администратора',
+            variant: 'destructive'
+          });
+        }
+      } else {
+        toast({
+          title: 'Ошибка входа',
+          description: data.error || 'Неверный логин или пароль',
+          variant: 'destructive'
+        });
+      }
+    } catch (error) {
+      toast({
+        title: 'Ошибка',
+        description: 'Не удалось подключиться к серверу',
+        variant: 'destructive'
+      });
+    } finally {
+      setIsLoggingIn(false);
+    }
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem('adminUser');
+    setCurrentUser(null);
+    setIsAuthenticated(false);
+    navigate('/');
+  };
 
   const loadStats = async () => {
     try {
@@ -222,18 +311,94 @@ export default function Admin() {
     v.employer_name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  if (isCheckingAuth) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <Icon name="Loader2" className="h-8 w-8 animate-spin mx-auto mb-4" />
+          <p className="text-muted-foreground">Проверка доступа...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-6">
+        <Card className="w-full max-w-md">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Icon name="Shield" className="h-5 w-5" />
+              Вход в админ-панель
+            </CardTitle>
+            <CardDescription>
+              Доступ только для администраторов
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div>
+              <Label>Email или телефон</Label>
+              <Input
+                type="text"
+                placeholder="example@mail.ru или +79991234567"
+                value={loginForm.login}
+                onChange={(e) => setLoginForm({ ...loginForm, login: e.target.value })}
+                onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
+              />
+            </div>
+            <div>
+              <Label>Пароль</Label>
+              <Input
+                type="password"
+                placeholder="Введите пароль"
+                value={loginForm.password}
+                onChange={(e) => setLoginForm({ ...loginForm, password: e.target.value })}
+                onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
+              />
+            </div>
+            <Button
+              className="w-full"
+              onClick={handleLogin}
+              disabled={isLoggingIn || !loginForm.login || !loginForm.password}
+            >
+              {isLoggingIn ? 'Проверка...' : 'Войти'}
+            </Button>
+            <Button
+              variant="outline"
+              className="w-full"
+              onClick={() => navigate('/')}
+            >
+              На главную
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-background">
       <header className="bg-accent text-accent-foreground shadow-md">
-        <div className="container mx-auto px-4 py-3 flex items-center justify-between">
+        <div className="container mx-auto px-4 py-3 flex items-center justify-between flex-wrap gap-2">
           <div className="flex items-center gap-2">
             <Icon name="Shield" size={24} />
-            <h1 className="text-xl font-bold">Админ-панель</h1>
+            <div>
+              <h1 className="text-xl font-bold">Админ-панель</h1>
+              <p className="text-xs opacity-80">
+                {currentUser?.name} • {currentUser?.email || currentUser?.phone}
+              </p>
+            </div>
           </div>
-          <Button variant="outline" size="sm" onClick={() => navigate('/')}>
-            <Icon name="Home" size={16} className="mr-2" />
-            На главную
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" onClick={handleLogout}>
+              <Icon name="LogOut" size={16} className="mr-2" />
+              Выйти
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => navigate('/')}>
+              <Icon name="Home" size={16} className="mr-2" />
+              На главную
+            </Button>
+          </div>
         </div>
       </header>
 

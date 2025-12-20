@@ -1,6 +1,5 @@
 import json
 import os
-import hashlib
 import secrets
 import re
 from typing import Dict, Any, Optional
@@ -12,6 +11,7 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 import urllib.request
 import urllib.parse
+import bcrypt
 
 
 def get_db_connection():
@@ -20,8 +20,14 @@ def get_db_connection():
 
 
 def hash_password(password: str) -> str:
-    """Хеширует пароль с использованием SHA-256"""
-    return hashlib.sha256(password.encode()).hexdigest()
+    """Хеширует пароль с использованием bcrypt"""
+    salt = bcrypt.gensalt()
+    return bcrypt.hashpw(password.encode('utf-8'), salt).decode('utf-8')
+
+
+def verify_password(password: str, hashed: str) -> bool:
+    """Проверяет пароль с использованием bcrypt"""
+    return bcrypt.checkpw(password.encode('utf-8'), hashed.encode('utf-8'))
 
 
 def generate_code() -> str:
@@ -433,9 +439,26 @@ def login_user(data: Dict[str, Any]) -> Dict[str, Any]:
                 'isBase64Encoded': False
             }
         
-        # Проверяем пароль
-        password_hash = hash_password(password)
-        if password_hash != user['password_hash']:
+        # Проверяем пароль (поддержка старых SHA-256 и новых bcrypt паролей)
+        password_hash = user['password_hash']
+        is_valid = False
+        
+        if password_hash.startswith('$2b$'):
+            # Новый bcrypt пароль
+            is_valid = verify_password(password, password_hash)
+        else:
+            # Старый SHA-256 пароль (обратная совместимость)
+            import hashlib
+            old_hash = hashlib.sha256(password.encode()).hexdigest()
+            is_valid = (old_hash == password_hash)
+            
+            # Автоматически обновляем на bcrypt при входе
+            if is_valid:
+                new_hash = hash_password(password)
+                cur.execute('UPDATE users SET password_hash = %s WHERE id = %s', (new_hash, user['id']))
+                conn.commit()
+        
+        if not is_valid:
             return {
                 'statusCode': 401,
                 'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
