@@ -1,0 +1,26 @@
+{
+  "tests": [
+    {
+      "name": "Get admin stats",
+      "method": "GET",
+      "path": "/?path=stats",
+      "expectedStatus": 200,
+      "expectedBody": {
+        "success": true,
+        "stats": {}
+      },
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "Moderate vacancy - missing fields",
+      "method": "POST",
+      "path": "/?path=moderate",
+      "body": {},
+      "expectedStatus": 400,
+      "expectedBody": {
+        "success": false
+      },
+      "bodyMatcher": "partial"
+    }
+  ]
+}

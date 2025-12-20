@@ -1,4 +1,5 @@
 {
+  "admin": "https://functions.poehali.dev/0d65638b-a8d6-40af-971b-31d0f9e356d0",
   "payments": "https://functions.poehali.dev/fc60f54b-d835-4f8b-9424-5d6c14a11945",
   "auth": "https://functions.poehali.dev/b3919417-c4e8-496a-982f-500d5754d530",
   "avito-sync": "https://functions.poehali.dev/300cf95d-737b-4557-81c3-01bccd37f7a4"
