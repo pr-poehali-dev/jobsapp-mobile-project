@@ -400,17 +400,16 @@ export default function Index() {
               </div>
 
               <div 
-                className="md:hidden absolute left-0 right-0 touch-none" 
+                className="md:hidden relative touch-none" 
                 style={{ 
-                  top: '0',
                   height: 'calc(100vh - 200px)',
                   overflow: 'hidden'
                 }}
               >
                 <div 
-                  className="absolute top-0 left-0 right-0 flex flex-col items-center px-4"
+                  className="absolute inset-0 flex flex-col items-center px-4 pt-0"
                   style={{
-                    transform: `translateY(calc(-${currentVacancyIndex * 75}vh + ${swipeOffset}px))`,
+                    transform: `translateY(calc(-${currentVacancyIndex * (70 + 4)}vh + ${swipeOffset}px))`,
                     transition: isDragging.current ? 'none' : 'transform 0.3s ease-out',
                   }}
                   onTouchStart={handleTouchStart}
@@ -420,9 +419,10 @@ export default function Index() {
                   {filteredVacancies.map((vacancy, index) => (
                     <Card 
                       key={vacancy.id}
-                      className="w-full max-w-md swipe-card touch-none flex-shrink-0 mb-4" 
+                      className="w-full max-w-md swipe-card touch-none flex-shrink-0" 
                       style={{
                         height: '70vh',
+                        marginBottom: '4vh',
                         opacity: index === currentVacancyIndex ? 1 : 0.6,
                         transform: index === currentVacancyIndex ? 'scale(1)' : 'scale(0.92)',
                         transition: 'opacity 0.3s ease-out, transform 0.3s ease-out',
