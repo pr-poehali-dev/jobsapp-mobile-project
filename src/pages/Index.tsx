@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -109,12 +109,43 @@ export default function Index() {
   const [showTierDialog, setShowTierDialog] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const touchStartY = useRef<number>(0);
+  const touchEndY = useRef<number>(0);
 
   const handleSwipeNext = () => {
     if (currentVacancyIndex < filteredVacancies.length - 1) {
       setCurrentVacancyIndex(currentVacancyIndex + 1);
     } else {
       setCurrentVacancyIndex(0);
+    }
+  };
+
+  const handleSwipePrev = () => {
+    if (currentVacancyIndex > 0) {
+      setCurrentVacancyIndex(currentVacancyIndex - 1);
+    } else {
+      setCurrentVacancyIndex(filteredVacancies.length - 1);
+    }
+  };
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    touchStartY.current = e.touches[0].clientY;
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    touchEndY.current = e.touches[0].clientY;
+  };
+
+  const handleTouchEnd = () => {
+    const swipeDistance = touchStartY.current - touchEndY.current;
+    const minSwipeDistance = 50;
+
+    if (Math.abs(swipeDistance) > minSwipeDistance) {
+      if (swipeDistance > 0) {
+        handleSwipeNext();
+      } else {
+        handleSwipePrev();
+      }
     }
   };
 
@@ -313,7 +344,12 @@ export default function Index() {
 
               <div className="md:hidden flex items-center justify-center min-h-[400px]">
                 {currentVacancy && (
-                  <Card className="w-full max-w-md swipe-card animate-fade-in" onClick={handleSwipeNext}>
+                  <Card 
+                    className="w-full max-w-md swipe-card animate-fade-in" 
+                    onTouchStart={handleTouchStart}
+                    onTouchMove={handleTouchMove}
+                    onTouchEnd={handleTouchEnd}
+                  >
                     <CardHeader>
                       <div className="flex items-start justify-between">
                         <div className="flex-1">
@@ -367,9 +403,10 @@ export default function Index() {
                           </div>
                         )}
                       </div>
-                      <div className="text-center text-xs text-muted-foreground pt-2">
-                        <Icon name="ArrowRight" size={16} className="inline mr-1" />
-                        Свайп для следующей вакансии ({currentVacancyIndex + 1}/{filteredVacancies.length})
+                      <div className="text-center text-xs text-muted-foreground pt-2 flex items-center justify-center gap-2">
+                        <Icon name="ChevronUp" size={16} className="inline" />
+                        <span>Свайп вверх/вниз ({currentVacancyIndex + 1}/{filteredVacancies.length})</span>
+                        <Icon name="ChevronDown" size={16} className="inline" />
                       </div>
                     </CardContent>
                   </Card>
