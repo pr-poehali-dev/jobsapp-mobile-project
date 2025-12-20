@@ -201,7 +201,7 @@ export default function Index() {
       setCurrentUser({
         id: 'admin',
         name: 'Администратор',
-        email: 'admin@jobsapp.ru',
+        email: 'admin@jobs-app.ru',
         phone: ADMIN_PHONE,
         role: 'admin',
         balance: 0,
@@ -308,7 +308,7 @@ export default function Index() {
         <div className="container mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Icon name="Briefcase" size={24} />
-            <h1 className="text-xl font-bold">JobsApp</h1>
+            <h1 className="text-xl font-bold">Jobs-App</h1>
           </div>
           <div className="flex items-center gap-2">
             {currentUser ? (
@@ -511,7 +511,7 @@ export default function Index() {
 
       <footer className="bg-accent text-accent-foreground py-4 mt-8 relative z-10">
         <div className="container mx-auto px-4 text-center text-sm">
-          <p>Обратная связь: jobsapp@yandex.ru</p>
+          <p>Обратная связь: jobs-app@yandex.ru</p>
         </div>
       </footer>
 

@@ -60,7 +60,7 @@ class AvitoParser(HTMLParser):
 def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     """
     Синхронизирует вакансии с Avito (Кировская область)
-    Возвращает список вакансий в формате JobsApp
+    Возвращает список вакансий в формате Jobs-App
     
     Args:
         event: HTTP событие с параметрами запроса
