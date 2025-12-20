@@ -347,7 +347,7 @@ export default function Index() {
       </header>
 
       <div className="container mx-auto px-4 py-4 flex-1 flex flex-col">
-        <div className="mb-4 space-y-3">
+        <div className="mb-4 space-y-3 relative z-10 bg-background md:bg-transparent">
           <div className="flex gap-2">
             <Input
               placeholder="Поиск вакансий..."
@@ -384,7 +384,7 @@ export default function Index() {
           </div>
         </div>
 
-        <div className="flex-1">
+        <div className="flex-1 relative">
           {filteredVacancies.length === 0 ? (
             <div className="text-center py-12">
               <Icon name="BriefcaseX" size={48} className="mx-auto mb-4 text-muted-foreground" />
@@ -404,10 +404,11 @@ export default function Index() {
               </div>
 
               <div 
-                className="md:hidden relative touch-none" 
+                className="md:hidden absolute left-0 right-0 touch-none" 
                 style={{ 
-                  height: 'calc(100vh - 160px)',
-                  overflow: 'visible'
+                  top: '0',
+                  height: 'calc(100vh - 200px)',
+                  overflow: 'hidden'
                 }}
               >
                 <div 
