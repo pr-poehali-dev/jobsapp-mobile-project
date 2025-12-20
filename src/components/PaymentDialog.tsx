@@ -37,7 +37,7 @@ export function PaymentDialog({ open, onClose, userId }: PaymentDialogProps) {
     setSelectedSystem(paymentSystem);
 
     try {
-      const response = await fetch(`${PAYMENTS_API_URL}/create-payment`, {
+      const response = await fetch(`${PAYMENTS_API_URL}?path=create-payment`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

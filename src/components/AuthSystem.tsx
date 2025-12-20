@@ -51,7 +51,7 @@ export function AuthSystem({ open, onClose, onSuccess }: AuthSystemProps) {
   const handleRegister = async () => {
     setLoading(true);
     try {
-      const response = await fetch(`${AUTH_API_URL}/register`, {
+      const response = await fetch(`${AUTH_API_URL}?path=register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -96,7 +96,7 @@ export function AuthSystem({ open, onClose, onSuccess }: AuthSystemProps) {
   const handleVerify = async () => {
     setLoading(true);
     try {
-      const response = await fetch(`${AUTH_API_URL}/verify`, {
+      const response = await fetch(`${AUTH_API_URL}?path=verify`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -135,7 +135,7 @@ export function AuthSystem({ open, onClose, onSuccess }: AuthSystemProps) {
   const handleLogin = async () => {
     setLoading(true);
     try {
-      const response = await fetch(`${AUTH_API_URL}/login`, {
+      const response = await fetch(`${AUTH_API_URL}?path=login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -174,7 +174,7 @@ export function AuthSystem({ open, onClose, onSuccess }: AuthSystemProps) {
   const handleResetPassword = async () => {
     setLoading(true);
     try {
-      const response = await fetch(`${AUTH_API_URL}/reset-password`, {
+      const response = await fetch(`${AUTH_API_URL}?path=reset-password`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -215,7 +215,7 @@ export function AuthSystem({ open, onClose, onSuccess }: AuthSystemProps) {
   const handleConfirmReset = async () => {
     setLoading(true);
     try {
-      const response = await fetch(`${AUTH_API_URL}/confirm-reset`, {
+      const response = await fetch(`${AUTH_API_URL}?path=confirm-reset`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
