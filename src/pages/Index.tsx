@@ -43,10 +43,11 @@ type User = {
 };
 
 const TIERS = [
-  { name: 'FREE', price: 0, limit: 1, badge: '' },
-  { name: 'ECONOM', price: 100, limit: 5, badge: '' },
-  { name: 'VIP', price: 500, limit: 30, badge: '⭐' },
-  { name: 'PREMIUM', price: 2500, limit: 150, badge: '👑' },
+  { name: 'FREE', price: 0, limit: 1, badge: '', moderationTime: '72' },
+  { name: 'ECONOM', price: 100, limit: 5, badge: '', moderationTime: '48' },
+  { name: 'VIP', price: 500, limit: 30, badge: '⭐', moderationTime: '24' },
+  { name: 'PREMIUM', price: 2500, limit: 150, badge: '👑', moderationTime: 'моментальная' },
+  { name: 'RUSH', price: 500, limit: 1, badge: '', moderationTime: 'моментальная', isOneTime: true },
 ];
 
 const TAGS = [
@@ -948,7 +949,7 @@ function TierDialog({
           <DialogDescription>Выберите подходящий тариф для размещения вакансий</DialogDescription>
         </DialogHeader>
         <div className="grid md:grid-cols-2 gap-4">
-          {TIERS.map((tier) => {
+          {TIERS.filter(t => !t.isOneTime).map((tier) => {
             const isCurrentTier = currentUser?.tier === tier.name;
             const canAfford = currentUser ? currentUser.balance >= tier.price : false;
             
@@ -970,27 +971,43 @@ function TierDialog({
                   <div className="space-y-2">
                     <div className="flex items-center gap-2 text-sm">
                       <Icon name="Check" size={16} className="text-primary" />
-                      <span>До {tier.limit} объявлений в месяц</span>
+                      <span>До {tier.limit} объявлени{tier.limit === 1 ? 'я' : 'й'} в месяц</span>
                     </div>
                     <div className="flex items-center gap-2 text-sm">
                       <Icon name="Check" size={16} className="text-primary" />
-                      <span>Модерация в течение 24 часов</span>
+                      <span>Модерация в течение {tier.moderationTime} часов*</span>
                     </div>
-                    {tier.name === 'VIP' && (
+                    {tier.name === 'ECONOM' && (
                       <div className="flex items-center gap-2 text-sm">
                         <Icon name="Check" size={16} className="text-primary" />
-                        <span>Значок VIP в объявлениях</span>
+                        <span>Ваши вакансии всегда выше чем у Free тарифа</span>
                       </div>
+                    )}
+                    {tier.name === 'VIP' && (
+                      <>
+                        <div className="flex items-center gap-2 text-sm">
+                          <Icon name="Check" size={16} className="text-primary" />
+                          <span>Ваши вакансии всегда выше чем у тарифа "Эконом"</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-sm">
+                          <Icon name="Check" size={16} className="text-primary" />
+                          <span>Значок VIP в объявлениях</span>
+                        </div>
+                      </>
                     )}
                     {tier.name === 'PREMIUM' && (
                       <>
                         <div className="flex items-center gap-2 text-sm">
                           <Icon name="Check" size={16} className="text-primary" />
-                          <span>Значок PREMIUM в объявлениях</span>
+                          <span>Моментальная модерация</span>
                         </div>
                         <div className="flex items-center gap-2 text-sm">
                           <Icon name="Check" size={16} className="text-primary" />
-                          <span>Приоритетная модерация</span>
+                          <span>Ваши вакансии после размещения всегда будут вверху поиска</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-sm">
+                          <Icon name="Check" size={16} className="text-primary" />
+                          <span>Значок PREMIUM в объявлениях</span>
                         </div>
                       </>
                     )}
@@ -1008,6 +1025,51 @@ function TierDialog({
               </Card>
             );
           })}
+
+          {TIERS.filter(t => t.isOneTime).map((tier) => {
+            const canAfford = currentUser ? currentUser.balance >= tier.price : false;
+            
+            return (
+              <Card key={tier.name} className="md:col-span-2">
+                <CardHeader>
+                  <CardTitle className="flex items-center justify-between">
+                    <span>"Вне очереди"</span>
+                  </CardTitle>
+                  <CardDescription className="text-2xl font-bold text-primary mt-2">
+                    {tier.price} ₽ за размещение
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2 text-sm">
+                      <Icon name="Check" size={16} className="text-primary" />
+                      <span>Вне очереди</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-sm">
+                      <Icon name="Check" size={16} className="text-primary" />
+                      <span>Моментальная модерация</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-sm">
+                      <Icon name="Check" size={16} className="text-primary" />
+                      <span>После размещения ваша вакансия попадает вверх списка, до публикации новых вакансий пользователями</span>
+                    </div>
+                  </div>
+                  <Button
+                    className="w-full"
+                    disabled={!canAfford}
+                    onClick={() => onSelectTier(tier.name)}
+                  >
+                    {!canAfford ? 'Недостаточно средств' : 'Купить размещение'}
+                  </Button>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
+        <div className="mt-4 p-3 bg-muted rounded-md">
+          <p className="text-xs text-muted-foreground">
+            * Время модерации зависит от очереди, если ваша вакансия после размещения первая в очереди то она будет опубликована сразу, чем выше тариф тем выше в очереди на модерацию ваша публикация.
+          </p>
         </div>
         {currentUser && (
           <div className="mt-4 p-3 bg-muted rounded-md">
