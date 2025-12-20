@@ -403,11 +403,17 @@ export default function Index() {
                 ))}
               </div>
 
-              <div className="md:hidden relative overflow-hidden touch-none" style={{ height: 'calc(100vh - 200px)' }}>
+              <div 
+                className="md:hidden relative touch-none" 
+                style={{ 
+                  height: 'calc(100vh - 160px)',
+                  overflow: 'visible'
+                }}
+              >
                 <div 
-                  className="absolute inset-0 flex flex-col items-center gap-4 px-4"
+                  className="absolute top-0 left-0 right-0 flex flex-col items-center px-4"
                   style={{
-                    transform: `translateY(calc(-${currentVacancyIndex * 100}% - ${currentVacancyIndex * 16}px + ${swipeOffset}px))`,
+                    transform: `translateY(calc(-${currentVacancyIndex * 75}vh + ${swipeOffset}px))`,
                     transition: isDragging.current ? 'none' : 'transform 0.3s ease-out',
                   }}
                   onTouchStart={handleTouchStart}
@@ -417,11 +423,11 @@ export default function Index() {
                   {filteredVacancies.map((vacancy, index) => (
                     <Card 
                       key={vacancy.id}
-                      className="w-full max-w-md swipe-card touch-none flex-shrink-0" 
+                      className="w-full max-w-md swipe-card touch-none flex-shrink-0 mb-4" 
                       style={{
-                        height: 'calc(100vh - 200px)',
-                        opacity: index === currentVacancyIndex ? 1 : 0.5,
-                        transform: index === currentVacancyIndex ? 'scale(1)' : 'scale(0.95)',
+                        height: '70vh',
+                        opacity: index === currentVacancyIndex ? 1 : 0.6,
+                        transform: index === currentVacancyIndex ? 'scale(1)' : 'scale(0.92)',
                         transition: 'opacity 0.3s ease-out, transform 0.3s ease-out',
                       }}
                     >
@@ -449,7 +455,7 @@ export default function Index() {
                           </div>
                         </div>
                       </CardHeader>
-                      <CardContent className="space-y-4 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 300px)' }}>
+                      <CardContent className="space-y-4 overflow-y-auto" style={{ maxHeight: 'calc(70vh - 120px)' }}>
                         <div className="flex flex-wrap gap-2">
                           {vacancy.tags.map((tag) => (
                             <Badge key={tag} variant="outline">
