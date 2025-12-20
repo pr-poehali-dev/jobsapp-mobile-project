@@ -403,86 +403,97 @@ export default function Index() {
                 ))}
               </div>
 
-              <div className="md:hidden flex items-center justify-center min-h-[400px] relative overflow-hidden touch-none">
-                {currentVacancy && (
-                  <Card 
-                    className="w-full max-w-md swipe-card touch-none" 
-                    style={{
-                      transform: `translateY(${swipeOffset}px)`,
-                      transition: isDragging.current ? 'none' : 'transform 0.3s ease-out',
-                    }}
-                    onTouchStart={handleTouchStart}
-                    onTouchMove={handleTouchMove}
-                    onTouchEnd={handleTouchEnd}
-                  >
-                    <CardHeader>
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          <CardTitle className="text-xl">{currentVacancy.title}</CardTitle>
-                          <CardDescription className="flex items-center gap-2 mt-1">
-                            <Icon name="MapPin" size={14} />
-                            {currentVacancy.city}
-                          </CardDescription>
-                        </div>
-                        <div className="flex flex-col items-end gap-1">
-                          {currentVacancy.source === 'avito' && (
-                            <Badge variant="outline" className="text-xs">
-                              Avito
-                            </Badge>
-                          )}
-                          {currentVacancy.employerTier !== 'FREE' && (
-                            <Badge variant="secondary">
-                              {TIERS.find((t) => t.name === currentVacancy.employerTier)?.badge}
-                              {currentVacancy.employerTier}
-                            </Badge>
-                          )}
-                        </div>
-                      </div>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                      <div className="flex flex-wrap gap-2">
-                        {currentVacancy.tags.map((tag) => (
-                          <Badge key={tag} variant="outline">
-                            {tag}
-                          </Badge>
-                        ))}
-                      </div>
-                      <p className="text-sm text-muted-foreground line-clamp-3">{currentVacancy.description}</p>
-                      <div className="pt-2 border-t space-y-2">
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm text-muted-foreground">Зарплата:</span>
-                          <span className="font-semibold text-primary">{currentVacancy.salary}</span>
-                        </div>
-                        {currentUser && currentUser.role !== 'guest' ? (
-                          <>
-                            <div className="flex items-center justify-between">
-                              <span className="text-sm text-muted-foreground">Работодатель:</span>
-                              <span className="text-sm font-medium">{currentVacancy.employerName}</span>
-                            </div>
-                            <div className="flex items-center justify-between">
-                              <span className="text-sm text-muted-foreground">Телефон:</span>
-                              <a href={`tel:${currentVacancy.phone}`} className="text-sm font-medium text-primary hover:underline">
-                                {currentVacancy.phone}
-                              </a>
-                            </div>
-                          </>
-                        ) : (
-                          <div className="bg-muted p-3 rounded-md text-center">
-                            <p className="text-sm text-muted-foreground mb-2">Войдите, чтобы увидеть контакты</p>
-                            <Button size="sm" onClick={() => setShowAuthDialog(true)}>
-                              Войти
-                            </Button>
+              <div className="md:hidden relative overflow-hidden touch-none" style={{ height: 'calc(100vh - 200px)' }}>
+                <div 
+                  className="absolute inset-0 flex flex-col items-center gap-4 px-4"
+                  style={{
+                    transform: `translateY(calc(-${currentVacancyIndex * 100}% - ${currentVacancyIndex * 16}px + ${swipeOffset}px))`,
+                    transition: isDragging.current ? 'none' : 'transform 0.3s ease-out',
+                  }}
+                  onTouchStart={handleTouchStart}
+                  onTouchMove={handleTouchMove}
+                  onTouchEnd={handleTouchEnd}
+                >
+                  {filteredVacancies.map((vacancy, index) => (
+                    <Card 
+                      key={vacancy.id}
+                      className="w-full max-w-md swipe-card touch-none flex-shrink-0" 
+                      style={{
+                        height: 'calc(100vh - 200px)',
+                        opacity: index === currentVacancyIndex ? 1 : 0.5,
+                        transform: index === currentVacancyIndex ? 'scale(1)' : 'scale(0.95)',
+                        transition: 'opacity 0.3s ease-out, transform 0.3s ease-out',
+                      }}
+                    >
+                      <CardHeader>
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <CardTitle className="text-xl">{vacancy.title}</CardTitle>
+                            <CardDescription className="flex items-center gap-2 mt-1">
+                              <Icon name="MapPin" size={14} />
+                              {vacancy.city}
+                            </CardDescription>
                           </div>
-                        )}
-                      </div>
-                      <div className="text-center text-xs text-muted-foreground pt-2 flex items-center justify-center gap-2">
-                        <Icon name="ChevronUp" size={16} className="inline" />
-                        <span>Свайп вверх/вниз ({currentVacancyIndex + 1}/{filteredVacancies.length})</span>
-                        <Icon name="ChevronDown" size={16} className="inline" />
-                      </div>
-                    </CardContent>
-                  </Card>
-                )}
+                          <div className="flex flex-col items-end gap-1">
+                            {vacancy.source === 'avito' && (
+                              <Badge variant="outline" className="text-xs">
+                                Avito
+                              </Badge>
+                            )}
+                            {vacancy.employerTier !== 'FREE' && (
+                              <Badge variant="secondary">
+                                {TIERS.find((t) => t.name === vacancy.employerTier)?.badge}
+                                {vacancy.employerTier}
+                              </Badge>
+                            )}
+                          </div>
+                        </div>
+                      </CardHeader>
+                      <CardContent className="space-y-4 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 300px)' }}>
+                        <div className="flex flex-wrap gap-2">
+                          {vacancy.tags.map((tag) => (
+                            <Badge key={tag} variant="outline">
+                              {tag}
+                            </Badge>
+                          ))}
+                        </div>
+                        <p className="text-sm text-muted-foreground">{vacancy.description}</p>
+                        <div className="pt-2 border-t space-y-2">
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm text-muted-foreground">Зарплата:</span>
+                            <span className="font-semibold text-primary">{vacancy.salary}</span>
+                          </div>
+                          {currentUser && currentUser.role !== 'guest' ? (
+                            <>
+                              <div className="flex items-center justify-between">
+                                <span className="text-sm text-muted-foreground">Работодатель:</span>
+                                <span className="text-sm font-medium">{vacancy.employerName}</span>
+                              </div>
+                              <div className="flex items-center justify-between">
+                                <span className="text-sm text-muted-foreground">Телефон:</span>
+                                <a href={`tel:${vacancy.phone}`} className="text-sm font-medium text-primary hover:underline">
+                                  {vacancy.phone}
+                                </a>
+                              </div>
+                            </>
+                          ) : (
+                            <div className="bg-muted p-3 rounded-md text-center">
+                              <p className="text-sm text-muted-foreground mb-2">Войдите, чтобы увидеть контакты</p>
+                              <Button size="sm" onClick={() => setShowAuthDialog(true)}>
+                                Войти
+                              </Button>
+                            </div>
+                          )}
+                        </div>
+                        <div className="text-center text-xs text-muted-foreground pt-2 flex items-center justify-center gap-2">
+                          <Icon name="ChevronUp" size={16} className="inline" />
+                          <span>Свайп вверх/вниз ({index + 1}/{filteredVacancies.length})</span>
+                          <Icon name="ChevronDown" size={16} className="inline" />
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
               </div>
             </>
           )}
