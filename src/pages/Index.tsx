@@ -496,7 +496,7 @@ export default function Index() {
         </div>
       </div>
 
-      <footer className="bg-accent text-accent-foreground py-4 mt-8">
+      <footer className="bg-accent text-accent-foreground py-4 mt-8 relative z-10">
         <div className="container mx-auto px-4 text-center text-sm">
           <p>Обратная связь: jobsapp@yandex.ru</p>
         </div>
