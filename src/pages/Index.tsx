@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -26,6 +26,7 @@ type Vacancy = {
   tags: string[];
   image?: string;
   status: 'pending' | 'published' | 'rejected';
+  source?: 'manual' | 'avito';
 };
 
 type User = {
@@ -96,10 +97,12 @@ const MOCK_VACANCIES: Vacancy[] = [
 
 const ADMIN_PHONE = '+79992255109';
 const ADMIN_PASSWORD = '23112311!!';
+const AVITO_SYNC_URL = 'https://functions.poehali.dev/300cf95d-737b-4557-81c3-01bccd37f7a4';
 
 export default function Index() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [vacancies, setVacancies] = useState<Vacancy[]>(MOCK_VACANCIES);
+  const [isLoadingAvito, setIsLoadingAvito] = useState(false);
   const [currentVacancyIndex, setCurrentVacancyIndex] = useState(0);
   const [showAuthDialog, setShowAuthDialog] = useState(false);
   const [showProfileDialog, setShowProfileDialog] = useState(false);
@@ -112,6 +115,43 @@ export default function Index() {
   const touchStartY = useRef<number>(0);
   const isDragging = useRef<boolean>(false);
   const [swipeOffset, setSwipeOffset] = useState(0);
+
+  // Загрузка вакансий с Avito при монтировании компонента
+  useEffect(() => {
+    loadAvitoVacancies();
+  }, []);
+
+  const loadAvitoVacancies = async () => {
+    setIsLoadingAvito(true);
+    try {
+      const response = await fetch(AVITO_SYNC_URL);
+      const data = await response.json();
+      
+      if (data.success && data.vacancies) {
+        // Добавляем вакансии с Avito к существующим
+        const avitoVacancies = data.vacancies.map((v: any) => ({
+          ...v,
+          source: 'avito' as const
+        }));
+        
+        // Убираем дубликаты по ID
+        const existingIds = new Set(vacancies.map(v => v.id));
+        const newVacancies = avitoVacancies.filter((v: Vacancy) => !existingIds.has(v.id));
+        
+        if (newVacancies.length > 0) {
+          setVacancies(prev => [...prev, ...newVacancies]);
+          toast({
+            title: 'Вакансии обновлены',
+            description: `Загружено ${newVacancies.length} вакансий с Avito`
+          });
+        }
+      }
+    } catch (error) {
+      console.error('Ошибка загрузки вакансий с Avito:', error);
+    } finally {
+      setIsLoadingAvito(false);
+    }
+  };
 
   const handleSwipeNext = () => {
     if (currentVacancyIndex < filteredVacancies.length - 1) {
@@ -308,12 +348,22 @@ export default function Index() {
 
       <div className="container mx-auto px-4 py-4 flex-1 flex flex-col">
         <div className="mb-4 space-y-3">
-          <Input
-            placeholder="Поиск вакансий..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full"
-          />
+          <div className="flex gap-2">
+            <Input
+              placeholder="Поиск вакансий..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="flex-1"
+            />
+            <Button 
+              size="sm" 
+              variant="outline" 
+              onClick={loadAvitoVacancies}
+              disabled={isLoadingAvito}
+            >
+              <Icon name={isLoadingAvito ? "Loader2" : "RefreshCw"} size={16} className={isLoadingAvito ? "animate-spin" : ""} />
+            </Button>
+          </div>
           <div className="flex gap-2 flex-wrap">
             {TAGS.map((tag) => (
               <Badge
@@ -374,12 +424,19 @@ export default function Index() {
                             {currentVacancy.city}
                           </CardDescription>
                         </div>
-                        {currentVacancy.employerTier !== 'FREE' && (
-                          <Badge variant="secondary">
-                            {TIERS.find((t) => t.name === currentVacancy.employerTier)?.badge}
-                            {currentVacancy.employerTier}
-                          </Badge>
-                        )}
+                        <div className="flex flex-col items-end gap-1">
+                          {currentVacancy.source === 'avito' && (
+                            <Badge variant="outline" className="text-xs">
+                              Avito
+                            </Badge>
+                          )}
+                          {currentVacancy.employerTier !== 'FREE' && (
+                            <Badge variant="secondary">
+                              {TIERS.find((t) => t.name === currentVacancy.employerTier)?.badge}
+                              {currentVacancy.employerTier}
+                            </Badge>
+                          )}
+                        </div>
                       </div>
                     </CardHeader>
                     <CardContent className="space-y-4">
@@ -502,12 +559,19 @@ function VacancyCard({ vacancy, currentUser, onAuthClick }: { vacancy: Vacancy; 
               {vacancy.city}
             </CardDescription>
           </div>
-          {vacancy.employerTier !== 'FREE' && (
-            <Badge variant="secondary">
-              {TIERS.find((t) => t.name === vacancy.employerTier)?.badge}
-              {vacancy.employerTier}
-            </Badge>
-          )}
+          <div className="flex flex-col items-end gap-1">
+            {vacancy.source === 'avito' && (
+              <Badge variant="outline" className="text-xs">
+                Avito
+              </Badge>
+            )}
+            {vacancy.employerTier !== 'FREE' && (
+              <Badge variant="secondary">
+                {TIERS.find((t) => t.name === vacancy.employerTier)?.badge}
+                {vacancy.employerTier}
+              </Badge>
+            )}
+          </div>
         </div>
       </CardHeader>
       <CardContent className="space-y-4">

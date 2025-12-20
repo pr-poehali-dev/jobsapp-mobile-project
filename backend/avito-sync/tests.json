@@ -1,0 +1,26 @@
+{
+  "tests": [
+    {
+      "name": "Получить вакансии с Avito",
+      "method": "GET",
+      "path": "/",
+      "expectedStatus": 200,
+      "expectedBody": {
+        "success": true,
+        "vacancies": "array"
+      },
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "Получить вакансии с пагинацией",
+      "method": "GET",
+      "path": "/?page=2&limit=10",
+      "expectedStatus": 200,
+      "expectedBody": {
+        "success": true,
+        "page": 2
+      },
+      "bodyMatcher": "partial"
+    }
+  ]
+}
