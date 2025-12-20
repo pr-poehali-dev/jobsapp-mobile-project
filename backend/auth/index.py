@@ -162,6 +162,10 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         # Роутинг
         if method == 'POST' and 'register' in path:
             return register_user(body)
+        elif method == 'POST' and 'verify-email-link' in path:
+            return verify_email_link(body)
+        elif method == 'POST' and 'link-email' in path:
+            return link_email(body)
         elif method == 'POST' and 'verify' in path:
             return verify_code(body)
         elif method == 'POST' and 'login' in path:
@@ -599,6 +603,163 @@ def confirm_reset(data: Dict[str, Any]) -> Dict[str, Any]:
             'body': json.dumps({
                 'success': True,
                 'message': 'Пароль успешно изменен'
+            }),
+            'isBase64Encoded': False
+        }
+        
+    except Exception as e:
+        conn.rollback()
+        raise e
+    finally:
+        cur.close()
+        conn.close()
+
+
+def link_email(data: Dict[str, Any]) -> Dict[str, Any]:
+    """Привязка email к существующему аккаунту"""
+    user_id = data.get('user_id')
+    email = data.get('email', '').strip().lower()
+    
+    if not user_id or not email:
+        return {
+            'statusCode': 400,
+            'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
+            'body': json.dumps({'error': 'Укажите user_id и email'}),
+            'isBase64Encoded': False
+        }
+    
+    if not validate_email(email):
+        return {
+            'statusCode': 400,
+            'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
+            'body': json.dumps({'error': 'Некорректный email адрес'}),
+            'isBase64Encoded': False
+        }
+    
+    conn = get_db_connection()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    
+    try:
+        # Проверяем существование пользователя
+        cur.execute('SELECT id, email FROM users WHERE id = %s', (user_id,))
+        user = cur.fetchone()
+        
+        if not user:
+            return {
+                'statusCode': 404,
+                'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
+                'body': json.dumps({'error': 'Пользователь не найден'}),
+                'isBase64Encoded': False
+            }
+        
+        if user['email']:
+            return {
+                'statusCode': 400,
+                'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
+                'body': json.dumps({'error': 'Email уже привязан к аккаунту'}),
+                'isBase64Encoded': False
+            }
+        
+        # Проверяем, не занят ли email другим пользователем
+        cur.execute('SELECT id FROM users WHERE email = %s', (email,))
+        if cur.fetchone():
+            return {
+                'statusCode': 400,
+                'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
+                'body': json.dumps({'error': 'Email уже используется'}),
+                'isBase64Encoded': False
+            }
+        
+        # Генерируем код
+        code = generate_code()
+        expires_at = datetime.now() + timedelta(minutes=10)
+        
+        cur.execute("""
+            INSERT INTO verification_codes (user_id, code, type, contact, expires_at)
+            VALUES (%s, %s, %s, %s, %s)
+        """, (user_id, code, 'email', email, expires_at))
+        
+        conn.commit()
+        
+        # Отправляем код
+        sent = send_email(email, code, 'verification')
+        
+        return {
+            'statusCode': 200,
+            'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
+            'body': json.dumps({
+                'success': True,
+                'code_sent': sent,
+                'message': f'Код отправлен на {email}' if sent else 'Используйте код: ' + code
+            }),
+            'isBase64Encoded': False
+        }
+        
+    except Exception as e:
+        conn.rollback()
+        raise e
+    finally:
+        cur.close()
+        conn.close()
+
+
+def verify_email_link(data: Dict[str, Any]) -> Dict[str, Any]:
+    """Подтверждение кода для привязки email"""
+    user_id = data.get('user_id')
+    code = data.get('code', '').strip()
+    
+    if not user_id or not code:
+        return {
+            'statusCode': 400,
+            'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
+            'body': json.dumps({'error': 'Укажите user_id и code'}),
+            'isBase64Encoded': False
+        }
+    
+    conn = get_db_connection()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    
+    try:
+        # Ищем код
+        cur.execute("""
+            SELECT * FROM verification_codes
+            WHERE user_id = %s AND code = %s AND type = 'email' 
+                  AND used = FALSE AND expires_at > NOW()
+            ORDER BY created_at DESC
+            LIMIT 1
+        """, (user_id, code))
+        
+        verification = cur.fetchone()
+        
+        if not verification:
+            return {
+                'statusCode': 400,
+                'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
+                'body': json.dumps({'error': 'Неверный или истекший код'}),
+                'isBase64Encoded': False
+            }
+        
+        email = verification['contact']
+        
+        # Привязываем email к пользователю
+        cur.execute("""
+            UPDATE users 
+            SET email = %s, email_verified = TRUE 
+            WHERE id = %s
+        """, (email, user_id))
+        
+        # Помечаем код использованным
+        cur.execute('UPDATE verification_codes SET used = TRUE WHERE id = %s', (verification['id'],))
+        
+        conn.commit()
+        
+        return {
+            'statusCode': 200,
+            'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
+            'body': json.dumps({
+                'success': True,
+                'email': email,
+                'message': 'Email успешно привязан'
             }),
             'isBase64Encoded': False
         }

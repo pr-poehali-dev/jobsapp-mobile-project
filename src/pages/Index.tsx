@@ -110,6 +110,7 @@ export default function Index() {
   const [showVacancyDialog, setShowVacancyDialog] = useState(false);
   const [showAdminDialog, setShowAdminDialog] = useState(false);
   const [showTierDialog, setShowTierDialog] = useState(false);
+  const [showLinkEmailDialog, setShowLinkEmailDialog] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const touchStartY = useRef<number>(0);
@@ -487,8 +488,22 @@ export default function Index() {
           setShowProfileDialog(false);
           setShowVacancyDialog(true);
         } : undefined}
+        onLinkEmail={() => {
+          setShowProfileDialog(false);
+          setShowLinkEmailDialog(true);
+        }}
       />
       <PaymentDialog open={showBalanceDialog} onClose={() => setShowBalanceDialog(false)} userId={currentUser?.id || ''} />
+      <LinkEmailDialog 
+        open={showLinkEmailDialog} 
+        onClose={() => setShowLinkEmailDialog(false)} 
+        userId={currentUser?.id || ''}
+        onSuccess={(email) => {
+          if (currentUser) {
+            setCurrentUser({ ...currentUser, email });
+          }
+        }}
+      />
       <VacancyDialog open={showVacancyDialog} onClose={() => setShowVacancyDialog(false)} onCreate={handleCreateVacancy} />
       <AdminDialog
         open={showAdminDialog}
@@ -587,7 +602,7 @@ function VacancyCard({ vacancy, currentUser, onAuthClick }: { vacancy: Vacancy; 
   );
 }
 
-function ProfileDialog({ open, onClose, user, onAddBalance, onSelectTier, onCreateVacancy }: { open: boolean; onClose: () => void; user: User | null; onAddBalance: () => void; onSelectTier: () => void; onCreateVacancy?: () => void }) {
+function ProfileDialog({ open, onClose, user, onAddBalance, onSelectTier, onCreateVacancy, onLinkEmail }: { open: boolean; onClose: () => void; user: User | null; onAddBalance: () => void; onSelectTier: () => void; onCreateVacancy?: () => void; onLinkEmail: () => void }) {
   if (!user) return null;
 
   return (
@@ -601,9 +616,16 @@ function ProfileDialog({ open, onClose, user, onAddBalance, onSelectTier, onCrea
             <Label>Имя</Label>
             <p className="text-sm mt-1">{user.name}</p>
           </div>
-          <div>
-            <Label>Email</Label>
-            <p className="text-sm mt-1">{user.email || 'Не указан'}</p>
+          <div className="flex items-center justify-between">
+            <div className="flex-1">
+              <Label>Email</Label>
+              <p className="text-sm mt-1">{user.email || 'Не указан'}</p>
+            </div>
+            {!user.email && (
+              <Button size="sm" variant="outline" onClick={onLinkEmail}>
+                Привязать
+              </Button>
+            )}
           </div>
           <div>
             <Label>Телефон</Label>
@@ -638,6 +660,130 @@ function ProfileDialog({ open, onClose, user, onAddBalance, onSelectTier, onCrea
                   Разместить вакансию
                 </Button>
               )}
+            </>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function LinkEmailDialog({ open, onClose, userId, onSuccess }: { open: boolean; onClose: () => void; userId: string; onSuccess: (email: string) => void }) {
+  const [email, setEmail] = useState('');
+  const [code, setCode] = useState('');
+  const [step, setStep] = useState<'email' | 'verify'>('email');
+  const [loading, setLoading] = useState(false);
+
+  const AUTH_API_URL = 'https://functions.poehali.dev/b3919417-c4e8-496a-982f-500d5754d530';
+
+  const handleSendCode = async () => {
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      toast({ title: 'Ошибка', description: 'Введите корректный email', variant: 'destructive' });
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const response = await fetch(`${AUTH_API_URL}?path=link-email`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: userId, email })
+      });
+
+      const data = await response.json();
+
+      if (response.ok && data.success) {
+        setStep('verify');
+        toast({ title: 'Код отправлен', description: 'Проверьте свою почту' });
+      } else {
+        toast({ title: 'Ошибка', description: data.error || 'Не удалось отправить код', variant: 'destructive' });
+      }
+    } catch (error) {
+      toast({ title: 'Ошибка', description: 'Не удалось подключиться к серверу', variant: 'destructive' });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleVerifyCode = async () => {
+    if (!code) {
+      toast({ title: 'Ошибка', description: 'Введите код', variant: 'destructive' });
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const response = await fetch(`${AUTH_API_URL}?path=verify-email-link`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: userId, code })
+      });
+
+      const data = await response.json();
+
+      if (response.ok && data.success) {
+        toast({ title: 'Успешно', description: 'Email привязан к аккаунту' });
+        onSuccess(email);
+        onClose();
+        setStep('email');
+        setEmail('');
+        setCode('');
+      } else {
+        toast({ title: 'Ошибка', description: data.error || 'Неверный код', variant: 'destructive' });
+      }
+    } catch (error) {
+      toast({ title: 'Ошибка', description: 'Не удалось подключиться к серверу', variant: 'destructive' });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onClose}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Привязать Email</DialogTitle>
+          <DialogDescription>
+            {step === 'email' ? 'Введите ваш email адрес' : 'Введите код из письма'}
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4">
+          {step === 'email' ? (
+            <>
+              <div>
+                <Label>Email</Label>
+                <Input 
+                  type="email" 
+                  placeholder="example@mail.com" 
+                  value={email} 
+                  onChange={(e) => setEmail(e.target.value)}
+                  disabled={loading}
+                />
+              </div>
+              <Button onClick={handleSendCode} disabled={loading} className="w-full">
+                {loading ? 'Отправка...' : 'Отправить код'}
+              </Button>
+            </>
+          ) : (
+            <>
+              <div>
+                <Label>Код подтверждения</Label>
+                <Input 
+                  placeholder="123456" 
+                  value={code} 
+                  onChange={(e) => setCode(e.target.value)}
+                  disabled={loading}
+                  maxLength={6}
+                />
+              </div>
+              <div className="flex gap-2">
+                <Button variant="outline" onClick={() => setStep('email')} disabled={loading} className="flex-1">
+                  Назад
+                </Button>
+                <Button onClick={handleVerifyCode} disabled={loading} className="flex-1">
+                  {loading ? 'Проверка...' : 'Подтвердить'}
+                </Button>
+              </div>
             </>
           )}
         </div>
