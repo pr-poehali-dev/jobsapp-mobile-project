@@ -13,6 +13,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { toast } from '@/hooks/use-toast';
 import { AuthSystem } from '@/components/AuthSystem';
 import { PaymentDialog } from '@/components/PaymentDialog';
+import { CitySelector } from '@/components/CitySelector';
+import { getAllCities } from '@/data/cities';
 
 type UserRole = 'guest' | 'seeker' | 'employer' | 'admin';
 
@@ -114,6 +116,7 @@ export default function Index() {
   const [showLinkEmailDialog, setShowLinkEmailDialog] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [selectedCity, setSelectedCity] = useState<string>('');
   const touchStartY = useRef<number>(0);
   const isDragging = useRef<boolean>(false);
   const [swipeOffset, setSwipeOffset] = useState(0);
@@ -254,6 +257,7 @@ export default function Index() {
     if (v.status !== 'published') return false;
     if (searchQuery && !v.title.toLowerCase().includes(searchQuery.toLowerCase())) return false;
     if (selectedTags.length > 0 && !selectedTags.some((tag) => v.tags.includes(tag))) return false;
+    if (selectedCity && v.city !== selectedCity) return false;
     return true;
   });
 
@@ -320,6 +324,10 @@ export default function Index() {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="flex-1"
+            />
+            <CitySelector 
+              selectedCity={selectedCity} 
+              onCityChange={setSelectedCity}
             />
             <Button 
               size="sm" 
@@ -839,7 +847,18 @@ function VacancyDialog({ open, onClose, onCreate }: { open: boolean; onClose: ()
           </div>
           <div>
             <Label>Город</Label>
-            <Input placeholder="Москва" value={vacancy.city} onChange={(e) => setVacancy({ ...vacancy, city: e.target.value })} />
+            <Select value={vacancy.city} onValueChange={(city) => setVacancy({ ...vacancy, city })}>
+              <SelectTrigger>
+                <SelectValue placeholder="Выберите город" />
+              </SelectTrigger>
+              <SelectContent>
+                {getAllCities().map((city) => (
+                  <SelectItem key={city} value={city}>
+                    {city}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
           <div>
             <Label>Телефон для связи</Label>
