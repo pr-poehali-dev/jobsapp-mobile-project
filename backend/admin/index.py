@@ -276,8 +276,8 @@ def create_vacancy(event: Dict[str, Any], conn, context: Any) -> Dict[str, Any]:
         if not user:
             return error_response(404, 'User not found')
         
-        # Проверка: только пользователи с платным тарифом могут создавать вакансии
-        if user['tier'] == 'FREE':
+        # Проверка: только пользователи с платным тарифом могут создавать вакансии (админы могут)
+        if user['tier'] == 'FREE' and user['role'] != 'admin':
             return error_response(403, 'Требуется платный тариф для размещения вакансий')
         
         vacancy_id = f"vac_{body['user_id']}_{int(context.request_time_epoch)}"

@@ -231,8 +231,11 @@ export default function Index() {
   const handleCreateVacancy = (vacancy: Partial<Vacancy>) => {
     if (!currentUser) return;
 
+    // Админы могут размещать вакансии без ограничений
+    const isAdmin = currentUser.role === 'admin';
+
     // Проверка: только пользователи с платным тарифом могут размещать вакансии
-    if (currentUser.tier === 'FREE') {
+    if (!isAdmin && currentUser.tier === 'FREE') {
       toast({
         title: 'Требуется платный тариф',
         description: 'Для размещения вакансий необходимо приобрести тариф',
@@ -244,13 +247,13 @@ export default function Index() {
     }
 
     const cost = 50;
-    if (currentUser.balance < cost) {
+    if (!isAdmin && currentUser.balance < cost) {
       toast({ title: 'Недостаточно средств', description: 'Пополните баланс', variant: 'destructive' });
       return;
     }
 
     const tierLimit = TIERS.find((t) => t.name === currentUser.tier)?.limit || 1;
-    if (currentUser.vacanciesThisMonth >= tierLimit) {
+    if (!isAdmin && currentUser.vacanciesThisMonth >= tierLimit) {
       toast({
         title: 'Лимит исчерпан',
         description: 'Повысьте тариф или купите объявление за 50 ₽',
@@ -267,18 +270,23 @@ export default function Index() {
       city: vacancy.city || '',
       phone: vacancy.phone || currentUser.phone,
       employerName: currentUser.name,
-      employerTier: currentUser.tier,
+      employerTier: isAdmin ? 'PREMIUM' : currentUser.tier,
       tags: vacancy.tags || [],
-      status: 'pending',
+      status: isAdmin ? 'published' : 'pending',
     };
 
     setVacancies([...vacancies, newVacancy]);
-    setCurrentUser({ ...currentUser, balance: currentUser.balance - cost, vacanciesThisMonth: currentUser.vacanciesThisMonth + 1 });
+    
+    // Админы не платят за вакансии
+    if (!isAdmin) {
+      setCurrentUser({ ...currentUser, balance: currentUser.balance - cost, vacanciesThisMonth: currentUser.vacanciesThisMonth + 1 });
+    }
+    
     setShowVacancyDialog(false);
 
     toast({
-      title: 'Объявление отправлено',
-      description: 'Ожидайте модерации. Вы получите уведомление после проверки.',
+      title: isAdmin ? 'Вакансия опубликована' : 'Объявление отправлено',
+      description: isAdmin ? 'Вакансия сразу появилась в ленте' : 'Ожидайте модерации. Вы получите уведомление после проверки.',
     });
   };
 
@@ -303,9 +311,24 @@ export default function Index() {
           <div className="flex items-center gap-2">
             {currentUser ? (
               currentUser.role === 'admin' ? (
-                <Button size="sm" variant="outline" onClick={() => setShowAdminDialog(true)}>
-                  <Icon name="Shield" size={16} />
-                </Button>
+                <>
+                  <Button 
+                    size="sm" 
+                    onClick={() => setShowVacancyDialog(true)}
+                    className="hidden md:flex"
+                  >
+                    Разместить вакансию
+                  </Button>
+                  <Button 
+                    size="sm" 
+                    variant="outline" 
+                    onClick={() => setShowAdminDialog(true)}
+                    className="bg-white text-gray-900 border-gray-300 hover:bg-gray-50"
+                  >
+                    <Icon name="Shield" size={16} className="mr-2" />
+                    Админка
+                  </Button>
+                </>
               ) : (
                 <>
                   {currentUser.role === 'employer' && (
