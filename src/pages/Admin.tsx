@@ -355,6 +355,11 @@ export default function Admin() {
         setShowVacancyDialog(false);
         loadVacancies('pending');
         loadStats();
+        
+        // Триггерим событие для обновления главной страницы
+        if (action === 'approve') {
+          window.dispatchEvent(new CustomEvent('vacancy-approved'));
+        }
       } else {
         throw new Error(data.error);
       }

@@ -8,6 +8,52 @@ import Icon from '@/components/ui/icon';
 import { toast } from '@/hooks/use-toast';
 import { ALL_REGIONS, getCitiesByRegion, findRegionByCity } from '@/data/cities';
 
+interface CitySearchSelectProps {
+  cities: string[];
+  selectedCity: string;
+  onCitySelect: (city: string) => void;
+}
+
+function CitySearchSelect({ cities, selectedCity, onCitySelect }: CitySearchSelectProps) {
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isOpen, setIsOpen] = useState(false);
+
+  const filteredCities = cities.filter(city => 
+    city.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  return (
+    <div className="relative">
+      <Input
+        placeholder="Начните вводить название города..."
+        value={searchQuery || selectedCity}
+        onChange={(e) => {
+          setSearchQuery(e.target.value);
+          setIsOpen(true);
+        }}
+        onFocus={() => setIsOpen(true)}
+      />
+      {isOpen && searchQuery && filteredCities.length > 0 && (
+        <div className="absolute z-50 w-full mt-1 bg-background border rounded-md shadow-lg max-h-60 overflow-y-auto">
+          {filteredCities.map((city) => (
+            <div
+              key={city}
+              className="px-3 py-2 cursor-pointer hover:bg-accent"
+              onClick={() => {
+                onCitySelect(city);
+                setSearchQuery('');
+                setIsOpen(false);
+              }}
+            >
+              {city}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 interface CitySelectorProps {
   selectedCity: string;
   onCityChange: (city: string) => void;
@@ -206,18 +252,11 @@ export function CitySelector({ selectedCity, onCityChange }: CitySelectorProps) 
             {selectedRegion && availableCities.length > 0 && (
               <div>
                 <Label>Город</Label>
-                <Select value={selectedCity} onValueChange={handleCitySelect}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Выберите город" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {availableCities.map((city) => (
-                      <SelectItem key={city} value={city}>
-                        {city}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <CitySearchSelect 
+                  cities={availableCities}
+                  selectedCity={selectedCity}
+                  onCitySelect={handleCitySelect}
+                />
               </div>
             )}
 

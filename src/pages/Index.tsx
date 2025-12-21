@@ -15,6 +15,52 @@ import { AuthSystem } from '@/components/AuthSystem';
 import { PaymentDialog } from '@/components/PaymentDialog';
 import { CitySelector } from '@/components/CitySelector';
 import { getAllCities } from '@/data/cities';
+
+interface CitySearchInputProps {
+  value: string;
+  onChange: (city: string) => void;
+}
+
+function CitySearchInput({ value, onChange }: CitySearchInputProps) {
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isOpen, setIsOpen] = useState(false);
+  const allCities = getAllCities();
+
+  const filteredCities = allCities.filter(city => 
+    city.toLowerCase().includes((searchQuery || value).toLowerCase())
+  );
+
+  return (
+    <div className="relative">
+      <Input
+        placeholder="Начните вводить название города..."
+        value={searchQuery || value}
+        onChange={(e) => {
+          setSearchQuery(e.target.value);
+          setIsOpen(true);
+        }}
+        onFocus={() => setIsOpen(true)}
+      />
+      {isOpen && filteredCities.length > 0 && (
+        <div className="absolute z-50 w-full mt-1 bg-background border rounded-md shadow-lg max-h-60 overflow-y-auto">
+          {filteredCities.slice(0, 50).map((city) => (
+            <div
+              key={city}
+              className="px-3 py-2 cursor-pointer hover:bg-accent text-sm"
+              onClick={() => {
+                onChange(city);
+                setSearchQuery('');
+                setIsOpen(false);
+              }}
+            >
+              {city}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 import { getMockVacancies } from '@/data/mock-vacancies';
 
 type UserRole = 'guest' | 'seeker' | 'employer' | 'admin';
@@ -63,6 +109,7 @@ const TAGS = [
 ];
 
 const AVITO_SYNC_URL = 'https://functions.poehali.dev/300cf95d-737b-4557-81c3-01bccd37f7a4';
+const ADMIN_API = 'https://functions.poehali.dev/0d65638b-a8d6-40af-971b-31d0f9e356d0';
 
 export default function Index() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
@@ -100,25 +147,64 @@ export default function Index() {
     }
   }, [selectedCity]);
 
-  // Загрузка вакансий с Avito при монтировании компонента
+  // Загрузка вакансий с Avito и из БД при монтировании компонента
   useEffect(() => {
     loadAvitoVacancies();
+    loadPublishedVacancies();
   }, []);
 
   // Обновление вакансий при изменении в localStorage
   useEffect(() => {
     const handleStorageChange = () => {
       const mockVacancies = getMockVacancies();
-      // Обновляем только моковые вакансии, сохраняя Avito
+      // Обновляем только моковые вакансии, сохраняя Avito и БД
       setVacancies(prev => [
         ...mockVacancies,
-        ...prev.filter(v => v.source === 'avito')
+        ...prev.filter(v => v.source === 'avito' || v.source === 'database')
       ]);
     };
 
+    const handleVacancyApproved = () => {
+      loadPublishedVacancies();
+    };
+
     window.addEventListener('storage', handleStorageChange);
-    return () => window.removeEventListener('storage', handleStorageChange);
-  }, []);
+    window.addEventListener('vacancy-approved', handleVacancyApproved);
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('vacancy-approved', handleVacancyApproved);
+    };
+  }, [loadPublishedVacancies]);
+
+  const loadPublishedVacancies = async () => {
+    try {
+      const response = await fetch(`${ADMIN_API}?path=vacancies&status=published&limit=100`);
+      const data = await response.json();
+      
+      if (data.success && data.vacancies) {
+        const dbVacancies = data.vacancies.map((v: any) => ({
+          id: v.id,
+          title: v.title,
+          description: v.description,
+          salary: v.salary,
+          city: v.city,
+          phone: v.phone,
+          employerName: v.employer_name,
+          employerTier: v.employer_tier,
+          tags: v.tags || [],
+          status: 'published' as const,
+          source: 'database' as const
+        }));
+        
+        setVacancies(prev => [
+          ...prev.filter(v => v.source !== 'database'),
+          ...dbVacancies
+        ]);
+      }
+    } catch (error) {
+      console.error('Ошибка загрузки вакансий из БД:', error);
+    }
+  };
 
   const loadAvitoVacancies = async () => {
     setIsLoadingAvito(true);
@@ -273,6 +359,15 @@ export default function Index() {
     if (selectedTags.length > 0 && !selectedTags.some((tag) => v.tags.includes(tag))) return false;
     if (selectedCity && v.city !== selectedCity) return false;
     return true;
+  }).sort((a, b) => {
+    // Сортировка: PREMIUM > VIP > остальные
+    const tierOrder: Record<string, number> = {
+      'PREMIUM': 3,
+      'VIP': 2,
+      'ECONOM': 1,
+      'FREE': 0
+    };
+    return (tierOrder[b.employerTier] || 0) - (tierOrder[a.employerTier] || 0);
   });
 
   const currentVacancy = filteredVacancies[currentVacancyIndex];
@@ -407,7 +502,10 @@ export default function Index() {
             <Button 
               size="sm" 
               variant="outline" 
-              onClick={loadAvitoVacancies}
+              onClick={() => {
+                loadAvitoVacancies();
+                loadPublishedVacancies();
+              }}
               disabled={isLoadingAvito}
             >
               <Icon name={isLoadingAvito ? "Loader2" : "RefreshCw"} size={16} className={isLoadingAvito ? "animate-spin" : ""} />
@@ -480,6 +578,7 @@ export default function Index() {
                         transform: index === currentVacancyIndex ? 'scale(1)' : 'scale(0.92)',
                         transition: 'opacity 0.3s ease-out, transform 0.3s ease-out',
                       }}
+                      className={vacancy.employerTier === 'PREMIUM' ? 'border-yellow-500 bg-gradient-to-br from-yellow-50 to-background' : ''}
                     >
                       <CardHeader>
                         <div className="flex items-start justify-between">
@@ -490,8 +589,14 @@ export default function Index() {
                               {vacancy.city}
                             </CardDescription>
                           </div>
-                          {vacancy.employerTier !== 'FREE' && (
-                            <Badge variant="secondary">
+                          {vacancy.employerTier === 'PREMIUM' && (
+                            <Badge className="bg-gradient-to-r from-yellow-400 to-yellow-600 text-white border-0">
+                              {TIERS.find((t) => t.name === vacancy.employerTier)?.badge}
+                              {vacancy.employerTier}
+                            </Badge>
+                          )}
+                          {vacancy.employerTier === 'VIP' && (
+                            <Badge className="bg-gradient-to-r from-purple-500 to-purple-700 text-white border-0">
                               {TIERS.find((t) => t.name === vacancy.employerTier)?.badge}
                               {vacancy.employerTier}
                             </Badge>
@@ -626,8 +731,14 @@ export default function Index() {
 }
 
 function VacancyCard({ vacancy, currentUser, onAuthClick }: { vacancy: Vacancy; currentUser: User | null; onAuthClick: () => void }) {
+  const cardClassName = vacancy.employerTier === 'PREMIUM' 
+    ? 'animate-fade-in hover:shadow-lg transition-shadow border-yellow-500 bg-gradient-to-br from-yellow-50 to-background'
+    : vacancy.employerTier === 'VIP'
+    ? 'animate-fade-in hover:shadow-lg transition-shadow border-purple-400 bg-gradient-to-br from-purple-50 to-background'
+    : 'animate-fade-in hover:shadow-lg transition-shadow';
+
   return (
-    <Card className="animate-fade-in hover:shadow-lg transition-shadow">
+    <Card className={cardClassName}>
       <CardHeader>
         <div className="flex items-start justify-between">
           <div className="flex-1">
@@ -637,8 +748,14 @@ function VacancyCard({ vacancy, currentUser, onAuthClick }: { vacancy: Vacancy; 
               {vacancy.city}
             </CardDescription>
           </div>
-          {vacancy.employerTier !== 'FREE' && (
-            <Badge variant="secondary">
+          {vacancy.employerTier === 'PREMIUM' && (
+            <Badge className="bg-gradient-to-r from-yellow-400 to-yellow-600 text-white border-0">
+              {TIERS.find((t) => t.name === vacancy.employerTier)?.badge}
+              {vacancy.employerTier}
+            </Badge>
+          )}
+          {vacancy.employerTier === 'VIP' && (
+            <Badge className="bg-gradient-to-r from-purple-500 to-purple-700 text-white border-0">
               {TIERS.find((t) => t.name === vacancy.employerTier)?.badge}
               {vacancy.employerTier}
             </Badge>
@@ -922,18 +1039,10 @@ function VacancyDialog({ open, onClose, onCreate }: { open: boolean; onClose: ()
           </div>
           <div>
             <Label>Город</Label>
-            <Select value={vacancy.city} onValueChange={(city) => setVacancy({ ...vacancy, city })}>
-              <SelectTrigger>
-                <SelectValue placeholder="Выберите город" />
-              </SelectTrigger>
-              <SelectContent>
-                {getAllCities().map((city) => (
-                  <SelectItem key={city} value={city}>
-                    {city}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <CitySearchInput 
+              value={vacancy.city}
+              onChange={(city) => setVacancy({ ...vacancy, city })}
+            />
           </div>
           <div>
             <Label>Телефон для связи</Label>
