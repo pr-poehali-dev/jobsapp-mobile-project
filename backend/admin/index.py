@@ -45,6 +45,8 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 return create_vacancy(event, conn, context)
             elif method == 'PUT':
                 return update_vacancy(event, conn)
+            elif method == 'DELETE':
+                return delete_vacancy(event, conn)
         elif path == 'moderate':
             return moderate_vacancy(event, conn)
         elif path == 'stats':
@@ -282,6 +284,11 @@ def create_vacancy(event: Dict[str, Any], conn, context: Any) -> Dict[str, Any]:
         
         vacancy_id = f"vac_{body['user_id']}_{int(context.request_time_epoch)}"
         
+        # Определяем статус: PREMIUM тариф и админы публикуют сразу, остальные на модерацию
+        status = body.get('status', 'published' if (user['tier'] == 'PREMIUM' or user['role'] == 'admin') else 'pending')
+        employer_tier = body.get('employer_tier', user['tier'])
+        employer_name = body.get('employer_name', user['name'])
+        
         cur.execute("""
             INSERT INTO vacancies (
                 id, user_id, title, description, salary, city, phone,
@@ -296,11 +303,11 @@ def create_vacancy(event: Dict[str, Any], conn, context: Any) -> Dict[str, Any]:
             body['salary'],
             body['city'],
             body['phone'],
-            user['name'],
-            user['tier'],
+            employer_name,
+            employer_tier,
             body.get('tags', []),
             body.get('image'),
-            'pending',
+            status,
             body.get('source', 'manual')
         ))
         
@@ -364,6 +371,38 @@ def update_vacancy(event: Dict[str, Any], conn) -> Dict[str, Any]:
                 'success': True,
                 'vacancy': dict(vacancy)
             }, default=str),
+            'isBase64Encoded': False
+        }
+
+
+def delete_vacancy(event: Dict[str, Any], conn) -> Dict[str, Any]:
+    """Удаляет вакансию по ID"""
+    body_str = event.get('body', '{}') or '{}'
+    body = json.loads(body_str)
+    vacancy_id = body.get('vacancy_id')
+    
+    if not vacancy_id:
+        return error_response(400, 'vacancy_id required')
+    
+    with conn.cursor(cursor_factory=RealDictCursor) as cur:
+        # Проверяем существование вакансии
+        cur.execute('SELECT id, title FROM vacancies WHERE id = %s', (vacancy_id,))
+        vacancy = cur.fetchone()
+        
+        if not vacancy:
+            return error_response(404, 'Vacancy not found')
+        
+        # Удаляем вакансию
+        cur.execute('DELETE FROM vacancies WHERE id = %s', (vacancy_id,))
+        conn.commit()
+        
+        return {
+            'statusCode': 200,
+            'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
+            'body': json.dumps({
+                'success': True,
+                'message': f'Вакансия "{vacancy["title"]}" успешно удалена'
+            }),
             'isBase64Encoded': False
         }
 

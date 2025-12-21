@@ -4,6 +4,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import Icon from '@/components/ui/icon';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
@@ -226,11 +227,17 @@ export default function Index() {
       loadPublishedVacancies();
     };
 
+    const handleVacancyDeleted = () => {
+      loadPublishedVacancies();
+    };
+
     window.addEventListener('storage', handleStorageChange);
     window.addEventListener('vacancy-approved', handleVacancyApproved);
+    window.addEventListener('vacancy-deleted', handleVacancyDeleted);
     return () => {
       window.removeEventListener('storage', handleStorageChange);
       window.removeEventListener('vacancy-approved', handleVacancyApproved);
+      window.removeEventListener('vacancy-deleted', handleVacancyDeleted);
     };
   }, []);
 
@@ -290,7 +297,7 @@ export default function Index() {
     }
   };
 
-  const handleCreateVacancy = (vacancy: Partial<Vacancy>) => {
+  const handleCreateVacancy = async (vacancy: Partial<Vacancy>) => {
     if (!currentUser) return;
 
     // Админы могут размещать вакансии без ограничений
@@ -324,32 +331,54 @@ export default function Index() {
       return;
     }
 
-    const newVacancy: Vacancy = {
-      id: Date.now().toString(),
-      title: vacancy.title || '',
-      description: vacancy.description || '',
-      salary: vacancy.salary || '',
-      city: vacancy.city || '',
-      phone: vacancy.phone || currentUser.phone,
-      employerName: currentUser.name,
-      employerTier: isAdmin ? 'PREMIUM' : currentUser.tier,
-      tags: vacancy.tags || [],
-      status: isAdmin ? 'published' : 'pending',
-    };
+    try {
+      // Отправляем вакансию в БД через API
+      const response = await fetch(`${ADMIN_API}?path=vacancies`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          user_id: currentUser.id,
+          title: vacancy.title || '',
+          description: vacancy.description || '',
+          salary: vacancy.salary || '',
+          city: vacancy.city || '',
+          phone: vacancy.phone || currentUser.phone || '',
+          employer_name: currentUser.name,
+          employer_tier: isAdmin ? 'PREMIUM' : currentUser.tier,
+          tags: vacancy.tags || [],
+          status: (isAdmin || currentUser.tier === 'PREMIUM') ? 'published' : 'pending'
+        })
+      });
 
-    setVacancies([...vacancies, newVacancy]);
-    
-    // Админы не платят за вакансии
-    if (!isAdmin) {
-      setCurrentUser({ ...currentUser, balance: currentUser.balance - cost, vacanciesThisMonth: currentUser.vacanciesThisMonth + 1 });
+      const data = await response.json();
+
+      if (data.success) {
+        // Админы не платят за вакансии
+        if (!isAdmin) {
+          setCurrentUser({ ...currentUser, balance: currentUser.balance - cost, vacanciesThisMonth: currentUser.vacanciesThisMonth + 1 });
+        }
+        
+        setShowVacancyDialog(false);
+
+        // Если вакансия сразу опубликована - обновляем список
+        if (data.vacancy.status === 'published') {
+          loadPublishedVacancies();
+        }
+
+        toast({
+          title: (isAdmin || currentUser.tier === 'PREMIUM') ? 'Вакансия опубликована' : 'Объявление отправлено',
+          description: (isAdmin || currentUser.tier === 'PREMIUM') ? 'Вакансия сразу появилась в ленте' : 'Ожидайте модерации. Вы получите уведомление после проверки.',
+        });
+      } else {
+        throw new Error(data.error || 'Не удалось создать вакансию');
+      }
+    } catch (error: any) {
+      toast({
+        title: 'Ошибка',
+        description: error.message || 'Не удалось создать вакансию',
+        variant: 'destructive'
+      });
     }
-    
-    setShowVacancyDialog(false);
-
-    toast({
-      title: isAdmin ? 'Вакансия опубликована' : 'Объявление отправлено',
-      description: isAdmin ? 'Вакансия сразу появилась в ленте' : 'Ожидайте модерации. Вы получите уведомление после проверки.',
-    });
   };
 
   const filteredVacancies = vacancies.filter((v) => {
@@ -552,14 +581,14 @@ export default function Index() {
               <div 
                 className="md:hidden relative touch-none" 
                 style={{ 
-                  height: 'calc(100vh - 140px)',
+                  height: 'calc(100vh - 200px)',
                   overflow: 'hidden'
                 }}
               >
                 <div 
-                  className="absolute inset-0 flex flex-col items-center px-4 pt-0"
+                  className="absolute top-0 left-0 right-0 flex flex-col items-center px-4"
                   style={{
-                    transform: `translateY(calc(-${currentVacancyIndex * 100}vh + ${swipeOffset}px))`,
+                    transform: `translateY(calc(-${currentVacancyIndex * 100}% + ${swipeOffset}px))`,
                     transition: isDragging.current ? 'none' : 'transform 0.3s ease-out',
                   }}
                   onTouchStart={handleTouchStart}
@@ -579,8 +608,9 @@ export default function Index() {
                         key={vacancy.id}
                         className={`${baseClassName} ${tierClassName}`}
                         style={{
-                          height: 'calc(100vh - 140px)',
+                          height: 'calc(100vh - 200px)',
                           marginBottom: '0',
+                          minHeight: 'calc(100vh - 200px)',
                           opacity: index === currentVacancyIndex ? 1 : 0,
                           transform: index === currentVacancyIndex ? 'scale(1)' : 'scale(0.95)',
                           transition: 'opacity 0.3s ease-out, transform 0.3s ease-out',
@@ -812,15 +842,92 @@ function VacancyCard({ vacancy, currentUser, onAuthClick }: { vacancy: Vacancy; 
 }
 
 function ProfileDialog({ open, onClose, user, onAddBalance, onSelectTier, onCreateVacancy, onLinkEmail }: { open: boolean; onClose: () => void; user: User | null; onAddBalance: () => void; onSelectTier: () => void; onCreateVacancy?: () => void; onLinkEmail: () => void }) {
+  const [userVacancies, setUserVacancies] = useState<Vacancy[]>([]);
+  const [isLoadingVacancies, setIsLoadingVacancies] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [vacancyToDelete, setVacancyToDelete] = useState<Vacancy | null>(null);
+
+  useEffect(() => {
+    if (open && user && user.role === 'employer') {
+      loadUserVacancies();
+    }
+  }, [open, user]);
+
+  const loadUserVacancies = async () => {
+    if (!user) return;
+    setIsLoadingVacancies(true);
+    try {
+      const response = await fetch(`${ADMIN_API}?path=vacancies&user_id=${user.id}&limit=50`);
+      const data = await response.json();
+      if (data.success) {
+        const mappedVacancies = data.vacancies.map((v: any) => ({
+          id: v.id,
+          title: v.title,
+          description: v.description,
+          salary: v.salary,
+          city: v.city,
+          phone: v.phone,
+          employerName: v.employer_name,
+          employerTier: v.employer_tier,
+          tags: v.tags || [],
+          status: v.status,
+          source: 'database' as const
+        }));
+        setUserVacancies(mappedVacancies);
+      }
+    } catch (error) {
+      console.error('Ошибка загрузки вакансий:', error);
+    } finally {
+      setIsLoadingVacancies(false);
+    }
+  };
+
+  const handleDeleteVacancy = async (vacancyId: string) => {
+    try {
+      const response = await fetch(`${ADMIN_API}?path=vacancies`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ vacancy_id: vacancyId })
+      });
+      const data = await response.json();
+      if (data.success) {
+        toast({
+          title: 'Успешно',
+          description: 'Вакансия удалена'
+        });
+        loadUserVacancies();
+        window.dispatchEvent(new CustomEvent('vacancy-deleted'));
+      } else {
+        throw new Error(data.error);
+      }
+    } catch (error: any) {
+      toast({
+        title: 'Ошибка',
+        description: error.message || 'Не удалось удалить вакансию',
+        variant: 'destructive'
+      });
+    } finally {
+      setShowDeleteDialog(false);
+      setVacancyToDelete(null);
+    }
+  };
+
   if (!user) return null;
 
   return (
+    <>
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent>
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Личный кабинет</DialogTitle>
         </DialogHeader>
-        <div className="space-y-4">
+        <Tabs defaultValue="profile" className="w-full">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="profile">Профиль</TabsTrigger>
+            <TabsTrigger value="vacancies">Мои вакансии</TabsTrigger>
+          </TabsList>
+          
+          <TabsContent value="profile" className="space-y-4 mt-4">
           <div>
             <Label>Имя</Label>
             <p className="text-sm mt-1">{user.name}</p>
@@ -871,9 +978,98 @@ function ProfileDialog({ open, onClose, user, onAddBalance, onSelectTier, onCrea
               )}
             </>
           )}
-        </div>
+          </TabsContent>
+
+          <TabsContent value="vacancies" className="space-y-4 mt-4">
+            {user.role === 'employer' && (
+              <>
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="font-semibold">Мои вакансии</h3>
+                  <Button size="sm" onClick={loadUserVacancies} disabled={isLoadingVacancies}>
+                    <Icon name={isLoadingVacancies ? "Loader2" : "RefreshCw"} size={14} className={isLoadingVacancies ? "animate-spin" : ""} />
+                  </Button>
+                </div>
+
+                {isLoadingVacancies ? (
+                  <div className="text-center py-8">
+                    <Icon name="Loader2" size={32} className="animate-spin mx-auto text-muted-foreground" />
+                  </div>
+                ) : userVacancies.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <Icon name="BriefcaseX" size={48} className="mx-auto mb-2" />
+                    <p>У вас пока нет вакансий</p>
+                    {onCreateVacancy && (
+                      <Button onClick={onCreateVacancy} className="mt-4">
+                        Создать вакансию
+                      </Button>
+                    )}
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {userVacancies.map((vacancy) => (
+                      <Card key={vacancy.id}>
+                        <CardHeader>
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1">
+                              <CardTitle className="text-base">{vacancy.title}</CardTitle>
+                              <CardDescription className="mt-1">
+                                {vacancy.city} • {vacancy.salary}
+                              </CardDescription>
+                            </div>
+                            <Badge variant={vacancy.status === 'published' ? 'default' : vacancy.status === 'pending' ? 'secondary' : 'destructive'}>
+                              {vacancy.status === 'published' ? 'Опубликовано' : vacancy.status === 'pending' ? 'На модерации' : 'Отклонено'}
+                            </Badge>
+                          </div>
+                        </CardHeader>
+                        <CardContent>
+                          <p className="text-sm text-muted-foreground line-clamp-2 mb-3">{vacancy.description}</p>
+                          <div className="flex gap-2">
+                            <Button
+                              size="sm"
+                              variant="destructive"
+                              onClick={() => {
+                                setVacancyToDelete(vacancy);
+                                setShowDeleteDialog(true);
+                              }}
+                            >
+                              <Icon name="Trash2" size={14} className="mr-1" />
+                              Удалить
+                            </Button>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
+          </TabsContent>
+        </Tabs>
       </DialogContent>
     </Dialog>
+
+    <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Удалить вакансию?</AlertDialogTitle>
+          <AlertDialogDescription>
+            Вы собираетесь удалить вакансию <strong>{vacancyToDelete?.title}</strong>.
+            <br /><br />
+            <strong className="text-destructive">Это действие нельзя отменить!</strong>
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Отмена</AlertDialogCancel>
+          <AlertDialogAction
+            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            onClick={() => vacancyToDelete && handleDeleteVacancy(vacancyToDelete.id)}
+          >
+            Удалить безвозвратно
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+    </>
   );
 }
 
