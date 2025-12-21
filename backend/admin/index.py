@@ -294,7 +294,9 @@ def create_vacancy(event: Dict[str, Any], conn, context: Any) -> Dict[str, Any]:
             if user['vacancies_this_month'] >= limit:
                 return error_response(403, f'Лимит вакансий исчерпан ({limit} в месяц для тарифа {user["tier"]})')
         
-        vacancy_id = f"vac_{body['user_id']}_{int(context.request_time_epoch)}"
+        # Генерируем ID вакансии с текущим timestamp
+        import time
+        vacancy_id = f"vac_{body['user_id']}_{int(time.time() * 1000)}"
         
         # Определяем статус: PREMIUM тариф и админы публикуют сразу, остальные на модерацию
         status = body.get('status', 'published' if (user['tier'] == 'PREMIUM' or user['role'] == 'admin') else 'pending')
