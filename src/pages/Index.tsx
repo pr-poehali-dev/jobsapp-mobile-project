@@ -15,6 +15,7 @@ import { toast } from '@/hooks/use-toast';
 import { AuthSystem } from '@/components/AuthSystem';
 import { PaymentDialog } from '@/components/PaymentDialog';
 import { CitySelector } from '@/components/CitySelector';
+import { EmployerBottomNav } from '@/components/EmployerBottomNav';
 import { getAllCities } from '@/data/cities';
 
 interface CitySearchInputProps {
@@ -126,6 +127,7 @@ export default function Index() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [selectedCity, setSelectedCity] = useState<string>('');
+  const [userVacancies, setUserVacancies] = useState<Vacancy[]>([]);
   const touchStartY = useRef<number>(0);
   const isDragging = useRef<boolean>(false);
   const [swipeOffset, setSwipeOffset] = useState(0);
@@ -205,11 +207,46 @@ export default function Index() {
     }
   };
 
+  // Загрузка вакансий работодателя
+  const loadEmployerVacancies = async () => {
+    if (!currentUser || currentUser.role !== 'employer') return;
+    try {
+      const response = await fetch(`${ADMIN_API}?path=vacancies&user_id=${currentUser.id}&limit=50`);
+      const data = await response.json();
+      if (data.success) {
+        const mappedVacancies = data.vacancies.map((v: any) => ({
+          id: v.id,
+          title: v.title,
+          description: v.description,
+          salary: v.salary,
+          city: v.city,
+          phone: v.phone,
+          employerName: v.employer_name,
+          employerTier: v.employer_tier,
+          tags: v.tags || [],
+          status: v.status,
+          source: 'database' as const,
+          created_at: v.created_at
+        }));
+        setUserVacancies(mappedVacancies);
+      }
+    } catch (error) {
+      console.error('Ошибка загрузки вакансий работодателя:', error);
+    }
+  };
+
   // Загрузка вакансий с Avito и из БД при монтировании компонента
   useEffect(() => {
     loadAvitoVacancies();
     loadPublishedVacancies();
   }, []);
+
+  // Загрузка вакансий работодателя при входе
+  useEffect(() => {
+    if (currentUser?.role === 'employer') {
+      loadEmployerVacancies();
+    }
+  }, [currentUser]);
 
   // Обновление вакансий при изменении в localStorage
   useEffect(() => {
@@ -347,6 +384,11 @@ export default function Index() {
         if (data.vacancy.status === 'published') {
           loadPublishedVacancies();
         }
+        
+        // Обновляем список вакансий работодателя
+        if (currentUser.role === 'employer') {
+          loadEmployerVacancies();
+        }
 
         toast({
           title: (isAdmin || currentUser.tier === 'PREMIUM') ? 'Вакансия опубликована' : 'Объявление отправлено',
@@ -359,6 +401,30 @@ export default function Index() {
       toast({
         title: 'Ошибка',
         description: error.message || 'Не удалось создать вакансию',
+        variant: 'destructive'
+      });
+    }
+  };
+
+  const handleDeleteEmployerVacancy = async (vacancyId: string) => {
+    try {
+      const response = await fetch(`${ADMIN_API}?path=vacancies`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ vacancy_id: vacancyId })
+      });
+      const data = await response.json();
+      if (data.success) {
+        toast({ title: 'Вакансия удалена' });
+        loadEmployerVacancies();
+        loadPublishedVacancies();
+      } else {
+        throw new Error(data.error);
+      }
+    } catch (error: any) {
+      toast({
+        title: 'Ошибка',
+        description: error.message || 'Не удалось удалить вакансию',
         variant: 'destructive'
       });
     }
@@ -473,7 +539,7 @@ export default function Index() {
         </div>
       </header>
 
-      <div className="container mx-auto px-4 py-4 flex-1 flex flex-col">
+      <div className={`container mx-auto px-4 py-4 flex-1 flex flex-col ${currentUser?.role === 'employer' ? 'mb-16 md:mb-0' : ''}`}>
         {/* Баннер для работодателей с FREE тарифом */}
         {currentUser?.role === 'employer' && currentUser.tier === 'FREE' && (
           <Card className="mb-4 border-primary bg-gradient-to-r from-primary/10 to-primary/5">
@@ -746,6 +812,16 @@ export default function Index() {
           toast({ title: 'Тариф изменен', description: `Теперь вы используете тариф ${tierName}` });
         }}
       />
+      
+      {/* Нижнее меню для работодателей */}
+      {currentUser?.role === 'employer' && (
+        <EmployerBottomNav
+          currentUser={currentUser}
+          vacancies={userVacancies}
+          onTierClick={() => setShowTierDialog(true)}
+          onDeleteVacancy={handleDeleteEmployerVacancy}
+        />
+      )}
     </div>
   );
 }
