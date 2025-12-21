@@ -245,9 +245,8 @@ export default function Index() {
   const handleSwipePrev = () => {
     if (currentVacancyIndex > 0) {
       setCurrentVacancyIndex(currentVacancyIndex - 1);
-    } else {
-      setCurrentVacancyIndex(filteredVacancies.length - 1);
     }
+    // Не даем переходить на последнюю карточку с первой
   };
 
   const handleTouchStart = (e: React.TouchEvent) => {
@@ -560,26 +559,34 @@ export default function Index() {
                 <div 
                   className="absolute inset-0 flex flex-col items-center px-4 pt-0"
                   style={{
-                    transform: `translateY(calc(-${currentVacancyIndex * (80 + 3)}vh + ${swipeOffset}px))`,
+                    transform: `translateY(calc(-${currentVacancyIndex * 100}vh + ${swipeOffset}px))`,
                     transition: isDragging.current ? 'none' : 'transform 0.3s ease-out',
                   }}
                   onTouchStart={handleTouchStart}
                   onTouchMove={handleTouchMove}
                   onTouchEnd={handleTouchEnd}
                 >
-                  {filteredVacancies.map((vacancy, index) => (
-                    <Card 
-                      key={vacancy.id}
-                      className="w-full max-w-md swipe-card touch-none flex-shrink-0" 
-                      style={{
-                        height: '80vh',
-                        marginBottom: '3vh',
-                        opacity: index === currentVacancyIndex ? 1 : 0.6,
-                        transform: index === currentVacancyIndex ? 'scale(1)' : 'scale(0.92)',
-                        transition: 'opacity 0.3s ease-out, transform 0.3s ease-out',
-                      }}
-                      className={vacancy.employerTier === 'PREMIUM' ? 'border-yellow-500 bg-gradient-to-br from-yellow-50 to-background' : ''}
-                    >
+                  {filteredVacancies.map((vacancy, index) => {
+                    const baseClassName = 'w-full max-w-md swipe-card touch-none flex-shrink-0';
+                    const tierClassName = vacancy.employerTier === 'PREMIUM' 
+                      ? 'border-yellow-500 bg-gradient-to-br from-yellow-50 to-background'
+                      : vacancy.employerTier === 'VIP'
+                      ? 'border-purple-400 bg-gradient-to-br from-purple-50 to-background'
+                      : '';
+                    
+                    return (
+                      <Card 
+                        key={vacancy.id}
+                        className={`${baseClassName} ${tierClassName}`}
+                        style={{
+                          height: 'calc(100vh - 140px)',
+                          marginBottom: '0',
+                          opacity: index === currentVacancyIndex ? 1 : 0,
+                          transform: index === currentVacancyIndex ? 'scale(1)' : 'scale(0.95)',
+                          transition: 'opacity 0.3s ease-out, transform 0.3s ease-out',
+                          pointerEvents: index === currentVacancyIndex ? 'auto' : 'none',
+                        }}
+                      >
                       <CardHeader>
                         <div className="flex items-start justify-between">
                           <div className="flex-1">
@@ -603,7 +610,7 @@ export default function Index() {
                           )}
                         </div>
                       </CardHeader>
-                      <CardContent className="space-y-4 overflow-y-auto" style={{ maxHeight: 'calc(80vh - 120px)' }}>
+                      <CardContent className="space-y-4 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 260px)' }}>
                         <div className="flex flex-wrap gap-2">
                           {vacancy.tags.map((tag) => (
                             <Badge key={tag} variant="outline">
@@ -645,8 +652,9 @@ export default function Index() {
                           <Icon name="ChevronDown" size={16} className="inline" />
                         </div>
                       </CardContent>
-                    </Card>
-                  ))}
+                      </Card>
+                    );
+                  })}
                 </div>
               </div>
             </>
