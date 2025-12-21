@@ -328,8 +328,8 @@ export default function Index() {
           phone: vacancy.phone || currentUser.phone || '',
           employer_name: currentUser.name,
           employer_tier: isAdmin ? 'PREMIUM' : currentUser.tier,
-          tags: vacancy.tags || [],
-          status: (isAdmin || currentUser.tier === 'PREMIUM') ? 'published' : 'pending'
+          tags: vacancy.tags || []
+          // status определяется на backend в зависимости от тарифа
         })
       });
 

@@ -1,6 +1,8 @@
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { PhoneInput } from '@/components/ui/phone-input';
+import { useState } from 'react';
 
 interface LoginFormProps {
   formData: {
@@ -23,16 +25,41 @@ export function LoginForm({
   onSwitchToReset,
   loading
 }: LoginFormProps) {
+  const [loginType, setLoginType] = useState<'email' | 'phone'>('email');
+  
+  // Автоопределение типа по вводу
+  const handleInputChange = (value: string) => {
+    if (value.startsWith('+7') || value.startsWith('7') || value.startsWith('8')) {
+      setLoginType('phone');
+    } else if (value.includes('@')) {
+      setLoginType('email');
+    }
+  };
+  
   return (
     <div className="space-y-4">
       <div>
         <Label>Email или телефон</Label>
-        <Input
-          type="text"
-          placeholder="example@mail.ru или +79991234567"
-          value={formData.email || formData.phone}
-          onChange={(e) => setFormData({ ...formData, email: e.target.value, phone: e.target.value })}
-        />
+        {loginType === 'phone' ? (
+          <PhoneInput
+            value={formData.phone}
+            onChange={(phone) => {
+              setFormData({ ...formData, phone, email: '' });
+              handleInputChange(phone);
+            }}
+          />
+        ) : (
+          <Input
+            type="text"
+            placeholder="example@mail.ru или начните вводить номер"
+            value={formData.email}
+            onChange={(e) => {
+              const value = e.target.value;
+              setFormData({ ...formData, email: value, phone: '' });
+              handleInputChange(value);
+            }}
+          />
+        )}
       </div>
       <div>
         <Label>Пароль</Label>

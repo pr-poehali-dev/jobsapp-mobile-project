@@ -494,7 +494,12 @@ export default function Admin() {
       </header>
 
       <div className="container mx-auto px-4 py-6">
-        <Tabs defaultValue="moderation" className="space-y-4">
+        <Tabs defaultValue="moderation" className="space-y-4" onValueChange={(value) => {
+          if (value === 'moderation') loadVacancies('pending');
+          if (value === 'all-vacancies') loadVacancies('published');
+          if (value === 'users') loadUsers();
+          if (value === 'stats') loadStats();
+        }}>
           <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="moderation">Модерация</TabsTrigger>
             <TabsTrigger value="users">Пользователи</TabsTrigger>
@@ -682,87 +687,101 @@ export default function Admin() {
           <TabsContent value="all-vacancies" className="space-y-4">
             <Card>
               <CardHeader>
-                <CardTitle>Все объявления главной страницы</CardTitle>
+                <CardTitle>Все опубликованные вакансии</CardTitle>
                 <CardDescription>
-                  Всего объявлений: {mockVacancies.length}
+                  Всего опубликовано: {stats?.vacancies.published || 0} вакансий
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="flex gap-2 mb-4">
                   <Input
-                    placeholder="Поиск по названию..."
-                    value={mockVacancySearchQuery}
-                    onChange={(e) => setMockVacancySearchQuery(e.target.value)}
+                    placeholder="Поиск по названию или работодателю..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
                     className="flex-1"
                   />
-                  <Button onClick={loadMockVacancies} variant="outline">
+                  <Button onClick={() => loadVacancies('published')} variant="outline">
                     <Icon name="RefreshCw" size={16} />
                   </Button>
                 </div>
 
-                {mockVacancies.filter(v => 
-                  v.title.toLowerCase().includes(mockVacancySearchQuery.toLowerCase()) ||
-                  v.employerName.toLowerCase().includes(mockVacancySearchQuery.toLowerCase())
-                ).length === 0 ? (
+                {loading ? (
+                  <div className="text-center py-8">
+                    <Icon name="Loader2" size={32} className="animate-spin mx-auto text-muted-foreground" />
+                  </div>
+                ) : filteredVacancies.length === 0 ? (
                   <div className="text-center py-8 text-muted-foreground">
                     <Icon name="BriefcaseX" size={48} className="mx-auto mb-2" />
-                    <p>Объявления не найдены</p>
+                    <p>Опубликованных вакансий нет</p>
                   </div>
                 ) : (
                   <div className="space-y-3">
-                    {mockVacancies
-                      .filter(v => 
-                        v.title.toLowerCase().includes(mockVacancySearchQuery.toLowerCase()) ||
-                        v.employerName.toLowerCase().includes(mockVacancySearchQuery.toLowerCase())
-                      )
-                      .map((vacancy) => (
-                        <Card key={vacancy.id} className="hover:shadow-md transition-shadow">
-                          <CardHeader>
-                            <div className="flex items-start justify-between">
-                              <div className="flex-1">
-                                <CardTitle className="text-lg">{vacancy.title}</CardTitle>
-                                <CardDescription className="mt-1">
-                                  {vacancy.employerName} • {vacancy.city}
-                                </CardDescription>
-                              </div>
-                              <Badge variant="outline">
-                                {vacancy.employerTier}
-                              </Badge>
+                    {filteredVacancies.map((vacancy) => (
+                      <Card key={vacancy.id} className="hover:shadow-md transition-shadow">
+                        <CardHeader>
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1">
+                              <CardTitle className="text-lg">{vacancy.title}</CardTitle>
+                              <CardDescription className="mt-1">
+                                {vacancy.employer_name} • {vacancy.city}
+                              </CardDescription>
                             </div>
-                          </CardHeader>
-                          <CardContent>
-                            <p className="text-sm mb-3 line-clamp-2">{vacancy.description}</p>
-                            <div className="flex items-center justify-between">
-                              <div className="flex gap-2">
-                                {vacancy.tags.map((tag: string) => (
-                                  <Badge key={tag} variant="secondary" className="text-xs">
-                                    {tag}
-                                  </Badge>
-                                ))}
-                              </div>
-                              <div className="flex gap-2">
-                                <Button 
-                                  size="sm" 
-                                  variant="destructive"
-                                  onClick={() => {
-                                    setVacancyToDelete(vacancy);
-                                    setShowDeleteVacancyDialog(true);
-                                  }}
-                                >
-                                  <Icon name="Trash2" size={14} className="mr-1" />
-                                  Удалить
-                                </Button>
-                              </div>
+                            <Badge variant="outline">
+                              {vacancy.employer_tier}
+                            </Badge>
+                          </div>
+                        </CardHeader>
+                        <CardContent>
+                          <p className="text-sm mb-3 line-clamp-2">{vacancy.description}</p>
+                          <div className="flex items-center justify-between">
+                            <div className="flex gap-2">
+                              {vacancy.tags.map((tag: string) => (
+                                <Badge key={tag} variant="secondary" className="text-xs">
+                                  {tag}
+                                </Badge>
+                              ))}
                             </div>
-                            <div className="mt-3 pt-3 border-t text-sm text-muted-foreground">
-                              <div className="flex justify-between">
-                                <span>Зарплата: {vacancy.salary}</span>
-                                <span>Телефон: {vacancy.phone}</span>
-                              </div>
+                            <div className="flex gap-2">
+                              <Button 
+                                size="sm" 
+                                variant="destructive"
+                                onClick={async () => {
+                                  if (confirm('Удалить эту вакансию?')) {
+                                    try {
+                                      const response = await fetch(`${ADMIN_API}?path=vacancies`, {
+                                        method: 'DELETE',
+                                        headers: { 'Content-Type': 'application/json' },
+                                        body: JSON.stringify({ vacancy_id: vacancy.id })
+                                      });
+                                      const data = await response.json();
+                                      if (data.success) {
+                                        toast({ title: 'Вакансия удалена' });
+                                        loadVacancies('published');
+                                      }
+                                    } catch (error) {
+                                      toast({ 
+                                        title: 'Ошибка', 
+                                        description: 'Не удалось удалить вакансию',
+                                        variant: 'destructive'
+                                      });
+                                    }
+                                  }
+                                }}
+                              >
+                                <Icon name="Trash2" size={14} className="mr-1" />
+                                Удалить
+                              </Button>
                             </div>
-                          </CardContent>
-                        </Card>
-                      ))}
+                          </div>
+                          <div className="mt-3 pt-3 border-t text-sm text-muted-foreground">
+                            <div className="flex justify-between">
+                              <span>Зарплата: {vacancy.salary}</span>
+                              <span>Телефон: {vacancy.phone}</span>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
                   </div>
                 )}
               </CardContent>

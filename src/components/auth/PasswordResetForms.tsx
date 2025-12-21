@@ -2,6 +2,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { PhoneInput } from '@/components/ui/phone-input';
 
 interface ResetPasswordFormProps {
   formData: {
@@ -50,11 +51,9 @@ export function ResetPasswordForm({
       ) : (
         <div>
           <Label>Телефон</Label>
-          <Input
-            type="tel"
-            placeholder="+79991234567"
+          <PhoneInput
             value={formData.phone}
-            onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+            onChange={(phone) => setFormData({ ...formData, phone })}
           />
         </div>
       )}
