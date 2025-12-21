@@ -74,11 +74,11 @@ type Vacancy = {
   city: string;
   phone: string;
   employerName: string;
-  employerTier: 'FREE' | 'ECONOM' | 'VIP' | 'PREMIUM';
+  employerTier: 'ECONOM' | 'VIP' | 'PREMIUM';
   tags: string[];
   image?: string;
   status: 'pending' | 'published' | 'rejected';
-  source?: 'manual' | 'avito';
+  source?: 'manual' | 'avito' | 'database';
 };
 
 type User = {
@@ -88,12 +88,11 @@ type User = {
   phone: string | null;
   role: UserRole;
   balance: number;
-  tier: 'FREE' | 'ECONOM' | 'VIP' | 'PREMIUM';
+  tier: 'ECONOM' | 'VIP' | 'PREMIUM';
   vacanciesThisMonth: number;
 };
 
 const TIERS = [
-  { name: 'FREE', price: 0, limit: 1, badge: '', moderationTime: '72' },
   { name: 'ECONOM', price: 100, limit: 5, badge: '', moderationTime: '48' },
   { name: 'VIP', price: 500, limit: 30, badge: '⭐', moderationTime: '24' },
   { name: 'PREMIUM', price: 2500, limit: 150, badge: '👑', moderationTime: 'моментальная' },
@@ -303,31 +302,15 @@ export default function Index() {
     // Админы могут размещать вакансии без ограничений
     const isAdmin = currentUser.role === 'admin';
 
-    // Проверка: только пользователи с платным тарифом могут размещать вакансии
-    if (!isAdmin && currentUser.tier === 'FREE') {
-      toast({
-        title: 'Требуется платный тариф',
-        description: 'Для размещения вакансий необходимо приобрести тариф',
-        variant: 'destructive',
-      });
-      setShowVacancyDialog(false);
-      setShowTierDialog(true);
-      return;
-    }
-
-    const cost = 50;
-    if (!isAdmin && currentUser.balance < cost) {
-      toast({ title: 'Недостаточно средств', description: 'Пополните баланс', variant: 'destructive' });
-      return;
-    }
-
-    const tierLimit = TIERS.find((t) => t.name === currentUser.tier)?.limit || 1;
+    // Проверка лимита вакансий по тарифу
+    const tierLimit = TIERS.find((t) => t.name === currentUser.tier)?.limit || 5;
     if (!isAdmin && currentUser.vacanciesThisMonth >= tierLimit) {
       toast({
         title: 'Лимит исчерпан',
-        description: 'Повысьте тариф или купите объявление за 50 ₽',
+        description: `Вы использовали ${currentUser.vacanciesThisMonth} из ${tierLimit} вакансий. Повысьте тариф для размещения большего количества вакансий.`,
         variant: 'destructive',
       });
+      setShowTierDialog(true);
       return;
     }
 
@@ -353,9 +336,9 @@ export default function Index() {
       const data = await response.json();
 
       if (data.success) {
-        // Админы не платят за вакансии
+        // Увеличиваем счетчик вакансий (админы тоже считаются)
         if (!isAdmin) {
-          setCurrentUser({ ...currentUser, balance: currentUser.balance - cost, vacanciesThisMonth: currentUser.vacanciesThisMonth + 1 });
+          setCurrentUser({ ...currentUser, vacanciesThisMonth: currentUser.vacanciesThisMonth + 1 });
         }
         
         setShowVacancyDialog(false);
@@ -388,12 +371,11 @@ export default function Index() {
     if (selectedCity && v.city !== selectedCity) return false;
     return true;
   }).sort((a, b) => {
-    // Сортировка: PREMIUM > VIP > остальные
+    // Сортировка: PREMIUM > VIP > ECONOM
     const tierOrder: Record<string, number> = {
       'PREMIUM': 3,
       'VIP': 2,
-      'ECONOM': 1,
-      'FREE': 0
+      'ECONOM': 1
     };
     return (tierOrder[b.employerTier] || 0) - (tierOrder[a.employerTier] || 0);
   });

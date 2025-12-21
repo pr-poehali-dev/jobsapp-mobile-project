@@ -222,44 +222,48 @@ def delete_user(event: Dict[str, Any], conn) -> Dict[str, Any]:
 
 
 def get_vacancies(params: Dict, conn) -> Dict[str, Any]:
-    status = params.get('status', 'published')
-    user_id = params.get('user_id')
-    limit = int(params.get('limit', '100'))
-    
-    with conn.cursor(cursor_factory=RealDictCursor) as cur:
-        if user_id:
-            cur.execute("""
-                SELECT * FROM vacancies 
-                WHERE user_id = %s
-                ORDER BY created_at DESC
-                LIMIT %s
-            """, (user_id, limit))
-        else:
-            cur.execute("""
-                SELECT * FROM vacancies 
-                WHERE status = %s
-                ORDER BY 
-                    CASE employer_tier
-                        WHEN 'PREMIUM' THEN 1
-                        WHEN 'VIP' THEN 2
-                        WHEN 'ECONOM' THEN 3
-                        WHEN 'FREE' THEN 4
-                    END,
-                    created_at DESC
-                LIMIT %s
-            """, (status, limit))
+    try:
+        status = params.get('status', 'published')
+        user_id = params.get('user_id')
+        limit = int(params.get('limit', '100'))
         
-        vacancies = cur.fetchall()
-        
-        return {
-            'statusCode': 200,
-            'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
-            'body': json.dumps({
-                'success': True,
-                'vacancies': [dict(v) for v in vacancies]
-            }, default=str),
-            'isBase64Encoded': False
-        }
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            if user_id:
+                cur.execute("""
+                    SELECT * FROM vacancies 
+                    WHERE user_id = %s
+                    ORDER BY created_at DESC
+                    LIMIT %s
+                """, (user_id, limit))
+            else:
+                cur.execute("""
+                    SELECT * FROM vacancies 
+                    WHERE status = %s
+                    ORDER BY 
+                        CASE employer_tier
+                            WHEN 'PREMIUM' THEN 1
+                            WHEN 'VIP' THEN 2
+                            WHEN 'ECONOM' THEN 3
+                            WHEN 'FREE' THEN 4
+                        END,
+                        created_at DESC
+                    LIMIT %s
+                """, (status, limit))
+            
+            vacancies = cur.fetchall()
+            
+            return {
+                'statusCode': 200,
+                'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
+                'body': json.dumps({
+                    'success': True,
+                    'vacancies': [dict(v) for v in vacancies]
+                }, default=str),
+                'isBase64Encoded': False
+            }
+    except Exception as e:
+        print(f'Error in get_vacancies: {e}')
+        return error_response(500, f'Database error: {str(e)}')
 
 
 def create_vacancy(event: Dict[str, Any], conn, context: Any) -> Dict[str, Any]:
@@ -278,9 +282,17 @@ def create_vacancy(event: Dict[str, Any], conn, context: Any) -> Dict[str, Any]:
         if not user:
             return error_response(404, 'User not found')
         
-        # Проверка: только пользователи с платным тарифом могут создавать вакансии (админы могут)
-        if user['tier'] == 'FREE' and user['role'] != 'admin':
-            return error_response(403, 'Требуется платный тариф для размещения вакансий')
+        # Проверка лимита вакансий по тарифу (админы не ограничены)
+        if user['role'] != 'admin':
+            tier_limits = {
+                'ECONOM': 5,
+                'VIP': 30,
+                'PREMIUM': 150
+            }
+            limit = tier_limits.get(user['tier'], 5)
+            
+            if user['vacancies_this_month'] >= limit:
+                return error_response(403, f'Лимит вакансий исчерпан ({limit} в месяц для тарифа {user["tier"]})')
         
         vacancy_id = f"vac_{body['user_id']}_{int(context.request_time_epoch)}"
         
