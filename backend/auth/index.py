@@ -48,6 +48,17 @@ def send_sms(phone: str, code: str) -> bool:
             print('SMSC credentials not configured, skipping SMS')
             return False
         
+        print(f'Attempting to send SMS to {phone}')
+        
+        # Нормализуем номер телефона (убираем все кроме цифр)
+        phone_clean = ''.join(filter(str.isdigit, phone))
+        # Если начинается с 8, заменяем на 7
+        if phone_clean.startswith('8'):
+            phone_clean = '7' + phone_clean[1:]
+        # Если не начинается с 7, добавляем 7
+        if not phone_clean.startswith('7'):
+            phone_clean = '7' + phone_clean
+        
         # Формируем сообщение
         message = f'Ваш код подтверждения: {code}'
         
@@ -55,18 +66,33 @@ def send_sms(phone: str, code: str) -> bool:
         params = {
             'login': login,
             'psw': password,
-            'phones': phone,
+            'phones': phone_clean,
             'mes': message,
-            'charset': 'utf-8'
+            'charset': 'utf-8',
+            'fmt': 3  # JSON формат ответа
         }
         
         url = 'https://smsc.ru/sys/send.php?' + urllib.parse.urlencode(params)
         response = urllib.request.urlopen(url, timeout=10)
         result = response.read().decode('utf-8')
         
-        return 'ERROR' not in result
+        print(f'SMSC response: {result}')
+        
+        # Проверяем ответ (в JSON формате)
+        import json
+        try:
+            result_json = json.loads(result)
+            if 'error' in result_json or 'error_code' in result_json:
+                print(f'SMSC error: {result_json}')
+                return False
+            return True
+        except:
+            # Fallback для старого формата
+            return 'ERROR' not in result.upper()
     except Exception as e:
         print(f'SMS sending failed: {e}')
+        import traceback
+        traceback.print_exc()
         return False
 
 
@@ -84,6 +110,8 @@ def send_email(email: str, code: str, purpose: str = 'verification') -> bool:
         if not all([smtp_host, smtp_email, smtp_password]):
             print('SMTP credentials not configured, skipping email')
             return False
+        
+        print(f'Attempting to send email to {email} via {smtp_host}:{smtp_port}')
         
         # Формируем письмо
         msg = MIMEMultipart('alternative')
@@ -103,19 +131,33 @@ def send_email(email: str, code: str, purpose: str = 'verification') -> bool:
         </html>
         """
         
-        part1 = MIMEText(text, 'plain')
-        part2 = MIMEText(html, 'html')
+        part1 = MIMEText(text, 'plain', 'utf-8')
+        part2 = MIMEText(html, 'html', 'utf-8')
         msg.attach(part1)
         msg.attach(part2)
         
         # Отправляем письмо
-        with smtplib.SMTP_SSL(smtp_host, smtp_port) as server:
-            server.login(smtp_email, smtp_password)
-            server.send_message(msg)
+        if smtp_port == 465:
+            # SSL
+            with smtplib.SMTP_SSL(smtp_host, smtp_port, timeout=30) as server:
+                server.set_debuglevel(0)
+                server.login(smtp_email, smtp_password)
+                server.send_message(msg)
+                print('Email sent successfully via SSL')
+        else:
+            # TLS (для порта 587)
+            with smtplib.SMTP(smtp_host, smtp_port, timeout=30) as server:
+                server.set_debuglevel(0)
+                server.starttls()
+                server.login(smtp_email, smtp_password)
+                server.send_message(msg)
+                print('Email sent successfully via TLS')
         
         return True
     except Exception as e:
         print(f'Email sending failed: {e}')
+        import traceback
+        traceback.print_exc()
         return False
 
 
