@@ -309,8 +309,31 @@ export default function Index() {
               ) : (
                 <>
                   {currentUser.role === 'employer' && (
-                    <Button size="sm" onClick={() => setShowVacancyDialog(true)} className="hidden md:flex">
-                      Разместить вакансию
+                    <Button 
+                      size="sm" 
+                      onClick={() => {
+                        if (currentUser.tier === 'FREE') {
+                          setShowTierDialog(true);
+                          toast({
+                            title: 'Требуется тариф',
+                            description: 'Выберите тариф для размещения вакансий',
+                            variant: 'destructive'
+                          });
+                        } else {
+                          setShowVacancyDialog(true);
+                        }
+                      }} 
+                      className="hidden md:flex"
+                      variant={currentUser.tier === 'FREE' ? 'outline' : 'default'}
+                    >
+                      {currentUser.tier === 'FREE' ? (
+                        <>
+                          <Icon name="Lock" size={16} className="mr-2" />
+                          Купить тариф
+                        </>
+                      ) : (
+                        'Разместить вакансию'
+                      )}
                     </Button>
                   )}
                   <Button 
@@ -346,6 +369,29 @@ export default function Index() {
       </header>
 
       <div className="container mx-auto px-4 py-4 flex-1 flex flex-col">
+        {/* Баннер для работодателей с FREE тарифом */}
+        {currentUser?.role === 'employer' && currentUser.tier === 'FREE' && (
+          <Card className="mb-4 border-primary bg-gradient-to-r from-primary/10 to-primary/5">
+            <CardContent className="p-4">
+              <div className="flex items-start gap-3">
+                <div className="bg-primary/20 rounded-full p-2">
+                  <Icon name="Rocket" size={24} className="text-primary" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="font-semibold text-lg mb-1">Начните размещать вакансии</h3>
+                  <p className="text-sm text-muted-foreground mb-3">
+                    Для публикации вакансий необходимо приобрести тариф. Выберите подходящий план и начните находить сотрудников уже сегодня!
+                  </p>
+                  <Button onClick={() => setShowTierDialog(true)} size="sm">
+                    <Icon name="Sparkles" size={16} className="mr-2" />
+                    Выбрать тариф
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         <div className="mb-4 space-y-3 relative z-10 bg-background md:bg-transparent">
           <div className="flex gap-2">
             <Input
