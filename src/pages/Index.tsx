@@ -147,35 +147,6 @@ export default function Index() {
     }
   }, [selectedCity]);
 
-  // Загрузка вакансий с Avito и из БД при монтировании компонента
-  useEffect(() => {
-    loadAvitoVacancies();
-    loadPublishedVacancies();
-  }, []);
-
-  // Обновление вакансий при изменении в localStorage
-  useEffect(() => {
-    const handleStorageChange = () => {
-      const mockVacancies = getMockVacancies();
-      // Обновляем только моковые вакансии, сохраняя Avito и БД
-      setVacancies(prev => [
-        ...mockVacancies,
-        ...prev.filter(v => v.source === 'avito' || v.source === 'database')
-      ]);
-    };
-
-    const handleVacancyApproved = () => {
-      loadPublishedVacancies();
-    };
-
-    window.addEventListener('storage', handleStorageChange);
-    window.addEventListener('vacancy-approved', handleVacancyApproved);
-    return () => {
-      window.removeEventListener('storage', handleStorageChange);
-      window.removeEventListener('vacancy-approved', handleVacancyApproved);
-    };
-  }, [loadPublishedVacancies]);
-
   const loadPublishedVacancies = async () => {
     try {
       const response = await fetch(`${ADMIN_API}?path=vacancies&status=published&limit=100`);
@@ -233,6 +204,35 @@ export default function Index() {
       setIsLoadingAvito(false);
     }
   };
+
+  // Загрузка вакансий с Avito и из БД при монтировании компонента
+  useEffect(() => {
+    loadAvitoVacancies();
+    loadPublishedVacancies();
+  }, []);
+
+  // Обновление вакансий при изменении в localStorage
+  useEffect(() => {
+    const handleStorageChange = () => {
+      const mockVacancies = getMockVacancies();
+      // Обновляем только моковые вакансии, сохраняя Avito и БД
+      setVacancies(prev => [
+        ...mockVacancies,
+        ...prev.filter(v => v.source === 'avito' || v.source === 'database')
+      ]);
+    };
+
+    const handleVacancyApproved = () => {
+      loadPublishedVacancies();
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    window.addEventListener('vacancy-approved', handleVacancyApproved);
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('vacancy-approved', handleVacancyApproved);
+    };
+  }, []);
 
   const handleSwipeNext = () => {
     if (currentVacancyIndex < filteredVacancies.length - 1) {
