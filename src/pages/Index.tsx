@@ -131,6 +131,7 @@ export default function Index() {
   const touchStartY = useRef<number>(0);
   const isDragging = useRef<boolean>(false);
   const [swipeOffset, setSwipeOffset] = useState(0);
+  const [swipeDirection, setSwipeDirection] = useState<'up' | 'down' | null>(null);
 
   // Загрузка сохраненного города из localStorage
   useEffect(() => {
@@ -248,6 +249,19 @@ export default function Index() {
     }
   }, [currentUser]);
 
+  // Отключаем скролл страницы на мобильных устройствах
+  useEffect(() => {
+    const isMobile = window.innerWidth < 768;
+    if (isMobile && filteredVacancies.length > 0) {
+      document.body.style.overflow = 'hidden';
+      document.body.style.height = '100vh';
+    }
+    return () => {
+      document.body.style.overflow = '';
+      document.body.style.height = '';
+    };
+  }, [filteredVacancies]);
+
   // Обновление вакансий при изменении в localStorage
   useEffect(() => {
     const handleStorageChange = () => {
@@ -288,8 +302,9 @@ export default function Index() {
   const handleSwipePrev = () => {
     if (currentVacancyIndex > 0) {
       setCurrentVacancyIndex(currentVacancyIndex - 1);
+    } else {
+      setCurrentVacancyIndex(filteredVacancies.length - 1); // Зацикливаем на конец
     }
-    // Не даем переходить на последнюю карточку с первой
   };
 
   const handleTouchStart = (e: React.TouchEvent) => {
@@ -632,39 +647,48 @@ export default function Index() {
                   height: 'calc(100vh - 200px)',
                   overflow: 'hidden'
                 }}
+                onTouchStart={handleTouchStart}
+                onTouchMove={handleTouchMove}
+                onTouchEnd={handleTouchEnd}
               >
-                <div 
-                  className="absolute top-0 left-0 right-0 flex flex-col items-center px-4"
-                  style={{
-                    transform: `translateY(calc(-${currentVacancyIndex * 100}% + ${swipeOffset}px))`,
-                    transition: isDragging.current ? 'none' : 'transform 0.3s ease-out',
-                  }}
-                  onTouchStart={handleTouchStart}
-                  onTouchMove={handleTouchMove}
-                  onTouchEnd={handleTouchEnd}
-                >
-                  {filteredVacancies.map((vacancy, index) => {
-                    const baseClassName = 'w-full max-w-md swipe-card touch-none flex-shrink-0';
-                    const tierClassName = vacancy.employerTier === 'PREMIUM' 
-                      ? 'border-yellow-500 bg-gradient-to-br from-yellow-50 to-background'
-                      : vacancy.employerTier === 'VIP'
-                      ? 'border-purple-400 bg-gradient-to-br from-purple-50 to-background'
-                      : '';
-                    
-                    return (
-                      <Card 
-                        key={vacancy.id}
-                        className={`${baseClassName} ${tierClassName}`}
-                        style={{
-                          height: 'calc(100vh - 200px)',
-                          marginBottom: '0',
-                          minHeight: 'calc(100vh - 200px)',
-                          opacity: index === currentVacancyIndex ? 1 : 0,
-                          transform: index === currentVacancyIndex ? 'scale(1)' : 'scale(0.95)',
-                          transition: 'opacity 0.3s ease-out, transform 0.3s ease-out',
-                          pointerEvents: index === currentVacancyIndex ? 'auto' : 'none',
-                        }}
-                      >
+                {filteredVacancies.map((vacancy, index) => {
+                  const isActive = index === currentVacancyIndex;
+                  const isPrev = index === currentVacancyIndex - 1 || (currentVacancyIndex === 0 && index === filteredVacancies.length - 1);
+                  const isNext = index === currentVacancyIndex + 1 || (currentVacancyIndex === filteredVacancies.length - 1 && index === 0);
+                  const isVisible = isActive || isPrev || isNext;
+                  
+                  if (!isVisible) return null;
+                  
+                  let translateY = 0;
+                  if (isActive) {
+                    translateY = swipeOffset;
+                  } else if (isPrev) {
+                    translateY = -100 + (swipeOffset > 0 ? swipeOffset / window.innerHeight * 100 : 0);
+                  } else if (isNext) {
+                    translateY = 100 + (swipeOffset < 0 ? swipeOffset / window.innerHeight * 100 : 0);
+                  }
+                  
+                  {
+                  const baseClassName = 'w-full max-w-md swipe-card touch-none flex-shrink-0 absolute left-0 right-0 mx-auto px-4';
+                  const tierClassName = vacancy.employerTier === 'PREMIUM' 
+                    ? 'border-yellow-500 bg-gradient-to-br from-yellow-50 to-background'
+                    : vacancy.employerTier === 'VIP'
+                    ? 'border-purple-400 bg-gradient-to-br from-purple-50 to-background'
+                    : '';
+                  
+                  return (
+                    <Card 
+                      key={vacancy.id}
+                      className={`${baseClassName} ${tierClassName}`}
+                      style={{
+                        height: 'calc(100vh - 200px)',
+                        transform: `translateY(${translateY}%)`,
+                        transition: isDragging.current ? 'none' : 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                        opacity: isActive ? 1 : 0.3,
+                        pointerEvents: isActive ? 'auto' : 'none',
+                        zIndex: isActive ? 10 : 5,
+                      }}
+                    >
                       <CardHeader>
                         <div className="flex items-start justify-between">
                           <div className="flex-1">
@@ -733,14 +757,13 @@ export default function Index() {
                       </Card>
                     );
                   })}
-                </div>
               </div>
             </>
           )}
         </div>
       </div>
 
-      <footer className="bg-accent text-accent-foreground py-4 mt-8 relative z-10">
+      <footer className={`bg-accent text-accent-foreground py-4 mt-8 relative z-10 ${currentUser?.role === 'employer' ? 'md:block hidden' : ''}`}>
         <div className="container mx-auto px-4 text-center text-sm">
           <p>Обратная связь: jobs-app@yandex.ru</p>
         </div>
