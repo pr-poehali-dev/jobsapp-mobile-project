@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import Icon from '@/components/ui/icon';
 import { toast } from '@/hooks/use-toast';
 import { useNavigate } from 'react-router-dom';
+import { getMockVacancies, deleteMockVacancy } from '@/data/mock-vacancies';
 
 const ADMIN_API = 'https://functions.poehali.dev/0d65638b-a8d6-40af-971b-31d0f9e356d0';
 const AUTH_API = 'https://functions.poehali.dev/b3919417-c4e8-496a-982f-500d5754d530';
@@ -84,6 +85,10 @@ export default function Admin() {
   const [usersLoading, setUsersLoading] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [userToDelete, setUserToDelete] = useState<User | null>(null);
+  const [mockVacancies, setMockVacancies] = useState<any[]>([]);
+  const [mockVacancySearchQuery, setMockVacancySearchQuery] = useState('');
+  const [showDeleteVacancyDialog, setShowDeleteVacancyDialog] = useState(false);
+  const [vacancyToDelete, setVacancyToDelete] = useState<any | null>(null);
 
   useEffect(() => {
     checkAuth();
@@ -93,8 +98,29 @@ export default function Admin() {
     if (isAuthenticated) {
       loadStats();
       loadVacancies('pending');
+      loadMockVacancies();
     }
   }, [isAuthenticated]);
+
+  const loadMockVacancies = () => {
+    const vacancies = getMockVacancies();
+    setMockVacancies(vacancies);
+  };
+
+  const handleDeleteMockVacancy = (id: string) => {
+    deleteMockVacancy(id);
+    loadMockVacancies();
+    setShowDeleteVacancyDialog(false);
+    setVacancyToDelete(null);
+    
+    // Триггерим событие storage для обновления главной страницы
+    window.dispatchEvent(new Event('storage'));
+    
+    toast({
+      title: 'Успешно',
+      description: 'Вакансия удалена'
+    });
+  };
 
   const checkAuth = () => {
     const savedUser = localStorage.getItem('adminUser');
@@ -464,9 +490,10 @@ export default function Admin() {
 
       <div className="container mx-auto px-4 py-6">
         <Tabs defaultValue="moderation" className="space-y-4">
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="moderation">Модерация</TabsTrigger>
             <TabsTrigger value="users">Пользователи</TabsTrigger>
+            <TabsTrigger value="all-vacancies">Все объявления</TabsTrigger>
             <TabsTrigger value="stats">Статистика</TabsTrigger>
           </TabsList>
 
@@ -641,6 +668,96 @@ export default function Admin() {
                         </CardContent>
                       </Card>
                     ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="all-vacancies" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Все объявления главной страницы</CardTitle>
+                <CardDescription>
+                  Всего объявлений: {mockVacancies.length}
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="flex gap-2 mb-4">
+                  <Input
+                    placeholder="Поиск по названию..."
+                    value={mockVacancySearchQuery}
+                    onChange={(e) => setMockVacancySearchQuery(e.target.value)}
+                    className="flex-1"
+                  />
+                  <Button onClick={loadMockVacancies} variant="outline">
+                    <Icon name="RefreshCw" size={16} />
+                  </Button>
+                </div>
+
+                {mockVacancies.filter(v => 
+                  v.title.toLowerCase().includes(mockVacancySearchQuery.toLowerCase()) ||
+                  v.employerName.toLowerCase().includes(mockVacancySearchQuery.toLowerCase())
+                ).length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <Icon name="BriefcaseX" size={48} className="mx-auto mb-2" />
+                    <p>Объявления не найдены</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {mockVacancies
+                      .filter(v => 
+                        v.title.toLowerCase().includes(mockVacancySearchQuery.toLowerCase()) ||
+                        v.employerName.toLowerCase().includes(mockVacancySearchQuery.toLowerCase())
+                      )
+                      .map((vacancy) => (
+                        <Card key={vacancy.id} className="hover:shadow-md transition-shadow">
+                          <CardHeader>
+                            <div className="flex items-start justify-between">
+                              <div className="flex-1">
+                                <CardTitle className="text-lg">{vacancy.title}</CardTitle>
+                                <CardDescription className="mt-1">
+                                  {vacancy.employerName} • {vacancy.city}
+                                </CardDescription>
+                              </div>
+                              <Badge variant="outline">
+                                {vacancy.employerTier}
+                              </Badge>
+                            </div>
+                          </CardHeader>
+                          <CardContent>
+                            <p className="text-sm mb-3 line-clamp-2">{vacancy.description}</p>
+                            <div className="flex items-center justify-between">
+                              <div className="flex gap-2">
+                                {vacancy.tags.map((tag: string) => (
+                                  <Badge key={tag} variant="secondary" className="text-xs">
+                                    {tag}
+                                  </Badge>
+                                ))}
+                              </div>
+                              <div className="flex gap-2">
+                                <Button 
+                                  size="sm" 
+                                  variant="destructive"
+                                  onClick={() => {
+                                    setVacancyToDelete(vacancy);
+                                    setShowDeleteVacancyDialog(true);
+                                  }}
+                                >
+                                  <Icon name="Trash2" size={14} className="mr-1" />
+                                  Удалить
+                                </Button>
+                              </div>
+                            </div>
+                            <div className="mt-3 pt-3 border-t text-sm text-muted-foreground">
+                              <div className="flex justify-between">
+                                <span>Зарплата: {vacancy.salary}</span>
+                                <span>Телефон: {vacancy.phone}</span>
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      ))}
                   </div>
                 )}
               </CardContent>
@@ -931,6 +1048,31 @@ export default function Admin() {
             <AlertDialogAction
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               onClick={() => userToDelete && deleteUser(userToDelete.id)}
+            >
+              Удалить безвозвратно
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Диалог подтверждения удаления вакансии */}
+      <AlertDialog open={showDeleteVacancyDialog} onOpenChange={setShowDeleteVacancyDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Удалить объявление?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Вы собираетесь удалить объявление <strong>{vacancyToDelete?.title}</strong>.
+              <br /><br />
+              Объявление будет удалено из главной страницы навсегда.
+              <br />
+              <strong className="text-destructive">Это действие нельзя отменить!</strong>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Отмена</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => vacancyToDelete && handleDeleteMockVacancy(vacancyToDelete.id)}
             >
               Удалить безвозвратно
             </AlertDialogAction>

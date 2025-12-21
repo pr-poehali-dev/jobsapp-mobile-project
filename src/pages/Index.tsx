@@ -15,6 +15,7 @@ import { AuthSystem } from '@/components/AuthSystem';
 import { PaymentDialog } from '@/components/PaymentDialog';
 import { CitySelector } from '@/components/CitySelector';
 import { getAllCities } from '@/data/cities';
+import { getMockVacancies } from '@/data/mock-vacancies';
 
 type UserRole = 'guest' | 'seeker' | 'employer' | 'admin';
 
@@ -61,50 +62,11 @@ const TAGS = [
   'Для студентов',
 ];
 
-const MOCK_VACANCIES: Vacancy[] = [
-  {
-    id: '1',
-    title: 'Менеджер по продажам',
-    description: 'Требуется активный менеджер для работы с клиентами. Полная занятость, официальное трудоустройство.',
-    salary: '60 000 - 80 000 ₽',
-    city: 'Москва',
-    phone: '+7 (999) 123-45-67',
-    employerName: 'ООО "Продажи+"',
-    employerTier: 'VIP',
-    tags: ['С опытом', 'Ежедневная оплата'],
-    status: 'published',
-  },
-  {
-    id: '2',
-    title: 'Грузчик на склад',
-    description: 'Работа на крупном складе. График 2/2. Без опыта, обучение на месте.',
-    salary: '45 000 ₽',
-    city: 'Санкт-Петербург',
-    phone: '+7 (999) 987-65-43',
-    employerName: 'Склад №1',
-    employerTier: 'PREMIUM',
-    tags: ['Без опыта', 'Вахтовый метод'],
-    status: 'published',
-  },
-  {
-    id: '3',
-    title: 'Курьер',
-    description: 'Доставка заказов по городу. Свободный график, ежедневные выплаты.',
-    salary: 'от 50 000 ₽',
-    city: 'Киров',
-    phone: '+7 (999) 555-44-33',
-    employerName: 'Быстрая доставка',
-    employerTier: 'ECONOM',
-    tags: ['Подработка', 'Ежедневная оплата', 'Для студентов'],
-    status: 'published',
-  },
-];
-
 const AVITO_SYNC_URL = 'https://functions.poehali.dev/300cf95d-737b-4557-81c3-01bccd37f7a4';
 
 export default function Index() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
-  const [vacancies, setVacancies] = useState<Vacancy[]>(MOCK_VACANCIES);
+  const [vacancies, setVacancies] = useState<Vacancy[]>(getMockVacancies());
   const [isLoadingAvito, setIsLoadingAvito] = useState(false);
   const [currentVacancyIndex, setCurrentVacancyIndex] = useState(0);
   const [showAuthDialog, setShowAuthDialog] = useState(false);
@@ -141,6 +103,21 @@ export default function Index() {
   // Загрузка вакансий с Avito при монтировании компонента
   useEffect(() => {
     loadAvitoVacancies();
+  }, []);
+
+  // Обновление вакансий при изменении в localStorage
+  useEffect(() => {
+    const handleStorageChange = () => {
+      const mockVacancies = getMockVacancies();
+      // Обновляем только моковые вакансии, сохраняя Avito
+      setVacancies(prev => [
+        ...mockVacancies,
+        ...prev.filter(v => v.source === 'avito')
+      ]);
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
   }, []);
 
   const loadAvitoVacancies = async () => {
