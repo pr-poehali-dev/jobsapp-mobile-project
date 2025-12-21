@@ -231,6 +231,18 @@ export default function Index() {
   const handleCreateVacancy = (vacancy: Partial<Vacancy>) => {
     if (!currentUser) return;
 
+    // Проверка: только пользователи с платным тарифом могут размещать вакансии
+    if (currentUser.tier === 'FREE') {
+      toast({
+        title: 'Требуется платный тариф',
+        description: 'Для размещения вакансий необходимо приобрести тариф',
+        variant: 'destructive',
+      });
+      setShowVacancyDialog(false);
+      setShowTierDialog(true);
+      return;
+    }
+
     const cost = 50;
     if (currentUser.balance < cost) {
       toast({ title: 'Недостаточно средств', description: 'Пополните баланс', variant: 'destructive' });

@@ -272,13 +272,13 @@ def register_user(data: Dict[str, Any]) -> Dict[str, Any]:
         
         # Создаем пользователя
         password_hash = hash_password(password)
-        initial_balance = 30 if role == 'employer' else 0
+        # Новые пользователи начинают с нулевым балансом и FREE тарифом
         
         cur.execute("""
-            INSERT INTO users (name, email, phone, password_hash, role, balance)
-            VALUES (%s, %s, %s, %s, %s, %s)
+            INSERT INTO users (name, email, phone, password_hash, role, balance, tier)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
             RETURNING id
-        """, (name, email if email else None, phone if phone else None, password_hash, role, initial_balance))
+        """, (name, email if email else None, phone if phone else None, password_hash, role, 0, 'FREE'))
         
         user_id = cur.fetchone()['id']
         
