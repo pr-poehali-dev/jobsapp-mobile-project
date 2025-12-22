@@ -1583,6 +1583,22 @@ function VacancyDialog({ open, onClose, onCreate }: { open: boolean; onClose: ()
                   // Нормализуем дефисы и тире с пробелами
                   const normalized = formatted.replace(/\s*[-–—]\s*/g, ' - ');
                   
+                  // Валидация диапазона (если есть дефис)
+                  const rangeMatch = normalized.match(/(\d[\d\s]*)\s*-\s*(\d[\d\s]*)/);
+                  if (rangeMatch) {
+                    const num1 = parseInt(rangeMatch[1].replace(/\s/g, ''));
+                    const num2 = parseInt(rangeMatch[2].replace(/\s/g, ''));
+                    
+                    if (num2 < num1) {
+                      toast({
+                        title: 'Некорректный диапазон',
+                        description: 'Максимальная зарплата не может быть меньше минимальной',
+                        variant: 'destructive'
+                      });
+                      return;
+                    }
+                  }
+                  
                   setVacancy({ ...vacancy, salary: normalized + ' ₽' });
                 }
               }}
