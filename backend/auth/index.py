@@ -39,6 +39,16 @@ def generate_code() -> str:
     return ''.join([str(secrets.randbelow(10)) for _ in range(6)])
 
 
+def normalize_phone(phone: str) -> str:
+    """Нормализует телефонный номер к формату +7XXXXXXXXXX"""
+    phone_clean = ''.join(filter(str.isdigit, phone))
+    if phone_clean.startswith('8'):
+        phone_clean = '7' + phone_clean[1:]
+    if not phone_clean.startswith('7'):
+        phone_clean = '7' + phone_clean
+    return '+' + phone_clean
+
+
 def send_sms(phone: str, code: str) -> tuple[bool, str]:
     """
     Отправляет SMS через SMSC.ru
@@ -516,7 +526,7 @@ def login_user(data: Dict[str, Any]) -> Dict[str, Any]:
 
 def reset_password(data: Dict[str, Any]) -> Dict[str, Any]:
     """Запрос на сброс пароля"""
-    contact = data.get('contact', '').strip().lower()
+    contact = data.get('contact', '').strip()
     reset_type = data.get('type', 'email')
     
     print(f'🔐 Запрос сброса пароля: contact={contact}, type={reset_type}')
@@ -529,13 +539,21 @@ def reset_password(data: Dict[str, Any]) -> Dict[str, Any]:
             'isBase64Encoded': False
         }
     
+    # Нормализуем контакт
+    if reset_type == 'sms':
+        contact_normalized = normalize_phone(contact)
+    else:
+        contact_normalized = contact.lower()
+    
+    print(f'📝 Нормализованный контакт: {contact_normalized}')
+    
     conn = get_db_connection()
     cur = conn.cursor(cursor_factory=RealDictCursor)
     
     try:
         cur.execute("""
             SELECT id FROM users WHERE email = %s OR phone = %s
-        """, (contact, contact))
+        """, (contact_normalized, contact_normalized))
         
         user = cur.fetchone()
         
@@ -559,17 +577,17 @@ def reset_password(data: Dict[str, Any]) -> Dict[str, Any]:
         cur.execute("""
             INSERT INTO verification_codes (user_id, code, type, contact, expires_at)
             VALUES (%s, %s, %s, %s, %s)
-        """, (user['id'], code, 'password_reset', contact, expires_at))
+        """, (user['id'], code, 'password_reset', contact_normalized, expires_at))
         
         conn.commit()
         print(f'✅ Код верификации сохранен: {code}')
         
-        if reset_type == 'email' and validate_email(contact):
-            print(f'📧 Отправка email на {contact}')
-            success, message = send_email(contact, code, 'password_reset')
-        elif reset_type == 'sms' and validate_phone(contact):
-            print(f'📱 Отправка SMS на {contact}')
-            success, message = send_sms(contact, code)
+        if reset_type == 'email' and validate_email(contact_normalized):
+            print(f'📧 Отправка email на {contact_normalized}')
+            success, message = send_email(contact_normalized, code, 'password_reset')
+        elif reset_type == 'sms' and validate_phone(contact_normalized):
+            print(f'📱 Отправка SMS на {contact_normalized}')
+            success, message = send_sms(contact_normalized, code)
         else:
             success, message = False, 'Некорректный формат контакта'
         
@@ -582,7 +600,7 @@ def reset_password(data: Dict[str, Any]) -> Dict[str, Any]:
                 'success': True,
                 'user_id': str(user['id']),
                 'code_sent': success,
-                'message': f'Код отправлен на {contact}' if success else message
+                'message': f'Код отправлен на {contact_normalized}' if success else message
             }),
             'isBase64Encoded': False
         }
