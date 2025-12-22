@@ -249,6 +249,24 @@ export default function Index() {
     }
   }, [currentUser]);
 
+  const filteredVacancies = useMemo(() => {
+    return vacancies.filter((v) => {
+      if (v.status !== 'published') return false;
+      if (searchQuery && !v.title.toLowerCase().includes(searchQuery.toLowerCase())) return false;
+      if (selectedTags.length > 0 && !selectedTags.some((tag) => v.tags.includes(tag))) return false;
+      if (selectedCity && v.city !== selectedCity) return false;
+      return true;
+    }).sort((a, b) => {
+      // Сортировка: PREMIUM > VIP > ECONOM
+      const tierOrder: Record<string, number> = {
+        'PREMIUM': 3,
+        'VIP': 2,
+        'ECONOM': 1
+      };
+      return (tierOrder[b.employerTier] || 0) - (tierOrder[a.employerTier] || 0);
+    });
+  }, [vacancies, searchQuery, selectedTags, selectedCity]);
+
   // Отключаем скролл страницы на мобильных устройствах
   useEffect(() => {
     const isMobile = window.innerWidth < 768;
@@ -290,24 +308,6 @@ export default function Index() {
       window.removeEventListener('vacancy-deleted', handleVacancyDeleted);
     };
   }, []);
-
-  const filteredVacancies = useMemo(() => {
-    return vacancies.filter((v) => {
-      if (v.status !== 'published') return false;
-      if (searchQuery && !v.title.toLowerCase().includes(searchQuery.toLowerCase())) return false;
-      if (selectedTags.length > 0 && !selectedTags.some((tag) => v.tags.includes(tag))) return false;
-      if (selectedCity && v.city !== selectedCity) return false;
-      return true;
-    }).sort((a, b) => {
-      // Сортировка: PREMIUM > VIP > ECONOM
-      const tierOrder: Record<string, number> = {
-        'PREMIUM': 3,
-        'VIP': 2,
-        'ECONOM': 1
-      };
-      return (tierOrder[b.employerTier] || 0) - (tierOrder[a.employerTier] || 0);
-    });
-  }, [vacancies, searchQuery, selectedTags, selectedCity]);
 
   const handleSwipeNext = () => {
     if (currentVacancyIndex < filteredVacancies.length - 1) {
