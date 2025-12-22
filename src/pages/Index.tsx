@@ -1562,16 +1562,23 @@ function VacancyDialog({ open, onClose, onCreate }: { open: boolean; onClose: ()
               placeholder="50 000 - 70 000" 
               value={vacancy.salary} 
               onChange={(e) => {
-                let value = e.target.value.replace(/₽/g, '').trim();
-                if (value && !value.endsWith('₽')) {
-                  value = value + ' ₽';
-                }
+                const value = e.target.value.replace(/₽/g, '').trim();
                 setVacancy({ ...vacancy, salary: value });
               }}
               onBlur={(e) => {
                 const value = e.target.value.replace(/₽/g, '').trim();
                 if (value) {
-                  setVacancy({ ...vacancy, salary: value + ' ₽' });
+                  // Форматируем только числа (добавляем пробелы в разрядах)
+                  const formatted = value.replace(/\b(\d+)\b/g, (match) => {
+                    // Убираем существующие пробелы в числе
+                    const num = match.replace(/\s/g, '');
+                    // Если число >= 1000, форматируем с пробелами
+                    if (num.length >= 4) {
+                      return num.replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+                    }
+                    return num;
+                  });
+                  setVacancy({ ...vacancy, salary: formatted + ' ₽' });
                 }
               }}
             />
