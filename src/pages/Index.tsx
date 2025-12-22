@@ -810,6 +810,14 @@ export default function Index() {
             setCurrentUser({ ...currentUser, vacanciesThisMonth: count });
           }
         }}
+        onLogout={() => {
+          setCurrentUser(null);
+          setShowProfileDialog(false);
+          toast({
+            title: 'Выход выполнен',
+            description: 'Вы успешно вышли из системы'
+          });
+        }}
       />
       <PaymentDialog open={showBalanceDialog} onClose={() => setShowBalanceDialog(false)} userId={currentUser?.id || ''} />
       <LinkEmailDialog 
@@ -942,7 +950,7 @@ function VacancyCard({ vacancy, currentUser, onAuthClick }: { vacancy: Vacancy; 
   );
 }
 
-function ProfileDialog({ open, onClose, user, onAddBalance, onSelectTier, onCreateVacancy, onLinkEmail, onUpdateVacanciesCount }: { open: boolean; onClose: () => void; user: User | null; onAddBalance: () => void; onSelectTier: () => void; onCreateVacancy?: () => void; onLinkEmail: () => void; onUpdateVacanciesCount: (count: number) => void }) {
+function ProfileDialog({ open, onClose, user, onAddBalance, onSelectTier, onCreateVacancy, onLinkEmail, onUpdateVacanciesCount, onLogout }: { open: boolean; onClose: () => void; user: User | null; onAddBalance: () => void; onSelectTier: () => void; onCreateVacancy?: () => void; onLinkEmail: () => void; onUpdateVacanciesCount: (count: number) => void; onLogout: () => void }) {
   const [userVacancies, setUserVacancies] = useState<Vacancy[]>([]);
   const [isLoadingVacancies, setIsLoadingVacancies] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
@@ -972,7 +980,8 @@ function ProfileDialog({ open, onClose, user, onAddBalance, onSelectTier, onCrea
           employerTier: v.employer_tier,
           tags: v.tags || [],
           status: v.status,
-          source: 'database' as const
+          source: 'database' as const,
+          rejection_reason: v.rejection_reason
         }));
         setUserVacancies(mappedVacancies);
       }
@@ -1036,6 +1045,12 @@ function ProfileDialog({ open, onClose, user, onAddBalance, onSelectTier, onCrea
             <Label>Имя</Label>
             <p className="text-sm mt-1">{user.name}</p>
           </div>
+          <div>
+            <Label>Роль</Label>
+            <p className="text-sm mt-1">
+              {user.role === 'seeker' ? 'Соискатель' : user.role === 'employer' ? 'Работодатель' : 'Администратор'}
+            </p>
+          </div>
           <div className="flex items-center justify-between">
             <div className="flex-1">
               <Label>Email</Label>
@@ -1082,6 +1097,14 @@ function ProfileDialog({ open, onClose, user, onAddBalance, onSelectTier, onCrea
               )}
             </>
           )}
+          <Button 
+            variant="outline" 
+            className="w-full" 
+            onClick={onLogout}
+          >
+            <Icon name="LogOut" size={16} className="mr-2" />
+            Выйти из аккаунта
+          </Button>
           </TabsContent>
 
           <TabsContent value="vacancies" className="space-y-4 mt-4">
@@ -1127,6 +1150,17 @@ function ProfileDialog({ open, onClose, user, onAddBalance, onSelectTier, onCrea
                         </CardHeader>
                         <CardContent>
                           <p className="text-sm text-muted-foreground line-clamp-2 mb-3">{vacancy.description}</p>
+                          {vacancy.status === 'rejected' && (vacancy as any).rejection_reason && (
+                            <div className="mb-3 p-3 bg-destructive/10 border border-destructive/20 rounded-md">
+                              <div className="flex items-start gap-2">
+                                <Icon name="AlertCircle" size={16} className="text-destructive mt-0.5" />
+                                <div className="flex-1">
+                                  <p className="text-sm font-medium text-destructive">Причина отклонения:</p>
+                                  <p className="text-sm text-muted-foreground mt-1">{(vacancy as any).rejection_reason}</p>
+                                </div>
+                              </div>
+                            </div>
+                          )}
                           <div className="flex gap-2">
                             <Button
                               size="sm"
@@ -1393,6 +1427,9 @@ function AdminDialog({
 }) {
   const [pendingVacancies, setPendingVacancies] = useState<Vacancy[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [showRejectDialog, setShowRejectDialog] = useState(false);
+  const [vacancyToReject, setVacancyToReject] = useState<Vacancy | null>(null);
+  const [rejectionReason, setRejectionReason] = useState('');
 
   const loadPendingVacancies = async () => {
     setIsLoading(true);
@@ -1458,18 +1495,34 @@ function AdminDialog({
     }
   };
 
-  const handleReject = async (id: string) => {
+  const handleReject = async () => {
+    if (!vacancyToReject || !rejectionReason.trim()) {
+      toast({
+        title: 'Ошибка',
+        description: 'Укажите причину отклонения',
+        variant: 'destructive'
+      });
+      return;
+    }
+
     try {
       const response = await fetch(`${ADMIN_API}?path=moderate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ vacancy_id: id, action: 'reject' })
+        body: JSON.stringify({ 
+          vacancy_id: vacancyToReject.id, 
+          action: 'reject',
+          rejection_reason: rejectionReason 
+        })
       });
       const data = await response.json();
       if (data.success) {
         toast({ title: 'Объявление отклонено' });
+        setShowRejectDialog(false);
+        setVacancyToReject(null);
+        setRejectionReason('');
         loadPendingVacancies();
-        onReject(id);
+        onReject(vacancyToReject.id);
       } else {
         throw new Error(data.error);
       }
@@ -1483,6 +1536,7 @@ function AdminDialog({
   };
 
   return (
+    <>
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
@@ -1529,7 +1583,15 @@ function AdminDialog({
                       <Icon name="Check" size={16} className="mr-1" />
                       Одобрить
                     </Button>
-                    <Button size="sm" variant="destructive" onClick={() => handleReject(vacancy.id)} className="flex-1">
+                    <Button 
+                      size="sm" 
+                      variant="destructive" 
+                      onClick={() => {
+                        setVacancyToReject(vacancy);
+                        setShowRejectDialog(true);
+                      }} 
+                      className="flex-1"
+                    >
                       <Icon name="X" size={16} className="mr-1" />
                       Отклонить
                     </Button>
@@ -1541,6 +1603,42 @@ function AdminDialog({
         </div>
       </DialogContent>
     </Dialog>
+
+    <AlertDialog open={showRejectDialog} onOpenChange={setShowRejectDialog}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Отклонить вакансию?</AlertDialogTitle>
+          <AlertDialogDescription>
+            Укажите причину отклонения вакансии <strong>{vacancyToReject?.title}</strong>.
+            Работодатель увидит это сообщение в своём профиле.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <div className="py-4">
+          <Label>Причина отклонения</Label>
+          <Textarea
+            placeholder="Например: Вакансия не соответствует правилам сервиса..."
+            value={rejectionReason}
+            onChange={(e) => setRejectionReason(e.target.value)}
+            rows={4}
+            className="mt-2"
+          />
+        </div>
+        <AlertDialogFooter>
+          <AlertDialogCancel onClick={() => {
+            setShowRejectDialog(false);
+            setVacancyToReject(null);
+            setRejectionReason('');
+          }}>Отмена</AlertDialogCancel>
+          <AlertDialogAction
+            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            onClick={handleReject}
+          >
+            Отклонить вакансию
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+    </>
   );
 }
 

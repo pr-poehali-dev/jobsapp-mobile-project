@@ -512,6 +512,7 @@ def moderate_vacancy(event: Dict[str, Any], conn) -> Dict[str, Any]:
     body = json.loads(body_str)
     vacancy_id = body.get('vacancy_id')
     action = body.get('action')
+    rejection_reason = body.get('rejection_reason', '')
     
     if not vacancy_id or action not in ['approve', 'reject']:
         return error_response(400, 'vacancy_id and action (approve/reject) required')
@@ -520,17 +521,18 @@ def moderate_vacancy(event: Dict[str, Any], conn) -> Dict[str, Any]:
         if action == 'approve':
             cur.execute("""
                 UPDATE vacancies 
-                SET status = 'published'
+                SET status = 'published', rejection_reason = NULL
                 WHERE id = %s
                 RETURNING *
             """, (vacancy_id,))
         else:
+            # При отклонении сохраняем причину
             cur.execute("""
                 UPDATE vacancies 
-                SET status = 'rejected'
+                SET status = 'rejected', rejection_reason = %s
                 WHERE id = %s
                 RETURNING *
-            """, (vacancy_id,))
+            """, (rejection_reason or 'Не указана', vacancy_id))
         
         conn.commit()
         vacancy = cur.fetchone()
