@@ -306,8 +306,8 @@ def create_vacancy(event: Dict[str, Any], conn, context: Any) -> Dict[str, Any]:
         cur.execute("""
             INSERT INTO vacancies (
                 id, user_id, title, description, salary, city, phone,
-                employer_name, employer_tier, tags, image, status, source
-            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                employer_name, employer_tier, tags, status, source
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             RETURNING *
         """, (
             vacancy_id,
@@ -320,7 +320,6 @@ def create_vacancy(event: Dict[str, Any], conn, context: Any) -> Dict[str, Any]:
             employer_name,
             employer_tier,
             body.get('tags', []),
-            body.get('image'),
             status,
             body.get('source', 'manual')
         ))
@@ -355,13 +354,8 @@ def update_vacancy(event: Dict[str, Any], conn) -> Dict[str, Any]:
             return error_response(400, 'Invalid status')
         update_fields.append('status = %s')
         params_list.append(body['status'])
-        
-        if body['status'] == 'published':
-            update_fields.append('published_at = CURRENT_TIMESTAMP')
     
-    if 'rejection_reason' in body:
-        update_fields.append('rejection_reason = %s')
-        params_list.append(body['rejection_reason'])
+
     
     if not update_fields:
         return error_response(400, 'No fields to update')
@@ -494,18 +488,17 @@ def moderate_vacancy(event: Dict[str, Any], conn) -> Dict[str, Any]:
         if action == 'approve':
             cur.execute("""
                 UPDATE vacancies 
-                SET status = 'published', published_at = CURRENT_TIMESTAMP
+                SET status = 'published'
                 WHERE id = %s
                 RETURNING *
             """, (vacancy_id,))
         else:
-            rejection_reason = body.get('rejection_reason', 'Не указана причина')
             cur.execute("""
                 UPDATE vacancies 
-                SET status = 'rejected', rejection_reason = %s
+                SET status = 'rejected'
                 WHERE id = %s
                 RETURNING *
-            """, (rejection_reason, vacancy_id))
+            """, (vacancy_id,))
         
         conn.commit()
         vacancy = cur.fetchone()
