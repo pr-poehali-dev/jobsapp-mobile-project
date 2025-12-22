@@ -1,8 +1,12 @@
+"""
+API аутентификации с Email и SMS верификацией
+Использует SMTP для email и SMSC.ru для SMS
+"""
 import json
 import os
 import secrets
 import re
-from typing import Dict, Any, Optional
+from typing import Dict, Any
 from datetime import datetime, timedelta
 import psycopg2
 from psycopg2.extras import RealDictCursor
@@ -35,82 +39,63 @@ def generate_code() -> str:
     return ''.join([str(secrets.randbelow(10)) for _ in range(6)])
 
 
-def send_sms(phone: str, code: str) -> bool:
+def send_sms(phone: str, code: str) -> tuple[bool, str]:
     """
     Отправляет SMS через SMSC.ru
-    Возвращает True если успешно, False если сервис недоступен
+    Возвращает (success, message)
     """
     try:
         login = os.environ.get('SMSC_LOGIN')
         password = os.environ.get('SMSC_PASSWORD')
         
         if not login or not password:
-            print('SMSC credentials not configured, skipping SMS')
-            return False
+            return False, 'SMS сервис не настроен'
         
-        print(f'Attempting to send SMS to {phone}')
-        
-        # Нормализуем номер телефона (убираем все кроме цифр)
+        # Нормализуем номер телефона
         phone_clean = ''.join(filter(str.isdigit, phone))
-        # Если начинается с 8, заменяем на 7
         if phone_clean.startswith('8'):
             phone_clean = '7' + phone_clean[1:]
-        # Если не начинается с 7, добавляем 7
         if not phone_clean.startswith('7'):
             phone_clean = '7' + phone_clean
         
-        # Формируем сообщение
-        message = f'Ваш код подтверждения: {code}'
+        message = f'Код подтверждения Jobs-App: {code}'
         
-        # Параметры запроса к SMSC API
         params = {
             'login': login,
             'psw': password,
             'phones': phone_clean,
             'mes': message,
             'charset': 'utf-8',
-            'fmt': 3  # JSON формат ответа
+            'fmt': 3
         }
         
         url = 'https://smsc.ru/sys/send.php?' + urllib.parse.urlencode(params)
         response = urllib.request.urlopen(url, timeout=10)
-        result = response.read().decode('utf-8')
+        result = json.loads(response.read().decode('utf-8'))
         
-        print(f'SMSC response: {result}')
+        if 'error' in result or 'error_code' in result:
+            error_code = result.get('error_code', 'unknown')
+            error_msg = result.get('error', 'Ошибка отправки SMS')
+            
+            if error_code == 2:
+                return False, 'Неверный логин или пароль SMSC'
+            elif error_code == 6:
+                return False, 'Недостаточно средств на балансе SMSC'
+            else:
+                return False, f'Ошибка SMSC: {error_msg}'
         
-        # Проверяем ответ (в JSON формате)
-        import json
-        try:
-            result_json = json.loads(result)
-            if 'error' in result_json or 'error_code' in result_json:
-                error_code = result_json.get('error_code', 'unknown')
-                error_msg = result_json.get('error', 'unknown error')
-                print(f'❌ SMSC error {error_code}: {error_msg}')
-                print(f'   Possible reasons:')
-                if error_code == 6:
-                    print(f'   - Недостаточно средств на балансе SMSC')
-                    print(f'   - Сообщение заблокировано фильтрами SMSC')
-                    print(f'   - Проверьте баланс на smsc.ru')
-                elif error_code == 1:
-                    print(f'   - Неверный логин или пароль SMSC')
-                print(f'   Full response: {result_json}')
-                return False
-            print(f'✅ SMS sent successfully: {result_json}')
-            return True
-        except:
-            # Fallback для старого формата
-            return 'ERROR' not in result.upper()
+        print(f'✅ SMS отправлена на {phone_clean}')
+        return True, 'SMS отправлена'
+        
     except Exception as e:
-        print(f'SMS sending failed: {e}')
-        import traceback
-        traceback.print_exc()
-        return False
+        print(f'❌ Ошибка отправки SMS: {e}')
+        return False, f'Ошибка отправки SMS: {str(e)}'
 
 
-def send_email(email: str, code: str, purpose: str = 'verification') -> bool:
+def send_email(email: str, code: str, purpose: str = 'verification') -> tuple[bool, str]:
     """
     Отправляет email с кодом верификации
-    Возвращает True если успешно, False если сервис недоступен
+    Возвращает (success, message)
     """
     try:
         smtp_host = os.environ.get('SMTP_HOST')
@@ -119,26 +104,38 @@ def send_email(email: str, code: str, purpose: str = 'verification') -> bool:
         smtp_password = os.environ.get('SMTP_PASSWORD')
         
         if not all([smtp_host, smtp_email, smtp_password]):
-            print('SMTP credentials not configured, skipping email')
-            return False
+            return False, 'Email сервис не настроен'
         
-        print(f'Attempting to send email to {email} via {smtp_host}:{smtp_port}')
-        
-        # Формируем письмо
         msg = MIMEMultipart('alternative')
-        msg['Subject'] = 'Код подтверждения Jobs-App' if purpose == 'verification' else 'Восстановление пароля Jobs-App'
+        
+        if purpose == 'verification':
+            msg['Subject'] = 'Код подтверждения Jobs-App'
+            title = 'Регистрация в Jobs-App'
+        else:
+            msg['Subject'] = 'Восстановление пароля Jobs-App'
+            title = 'Восстановление пароля'
+        
         msg['From'] = smtp_email
         msg['To'] = email
         
-        text = f'Ваш код подтверждения: {code}\n\nКод действителен в течение 10 минут.'
+        text = f'{title}\n\nВаш код подтверждения: {code}\n\nКод действителен 10 минут.'
+        
         html = f"""
         <html>
-            <body style="font-family: Arial, sans-serif;">
-                <h2>Jobs-App</h2>
-                <p>Ваш код подтверждения:</p>
-                <h1 style="color: #0099dd; letter-spacing: 5px;">{code}</h1>
-                <p style="color: #666;">Код действителен в течение 10 минут.</p>
-            </body>
+        <body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 20px; border-radius: 10px 10px 0 0;">
+                <h1 style="color: white; margin: 0;">Jobs-App</h1>
+            </div>
+            <div style="background: #f7f7f7; padding: 30px; border-radius: 0 0 10px 10px;">
+                <h2 style="color: #333;">{title}</h2>
+                <p style="color: #666; font-size: 16px;">Ваш код подтверждения:</p>
+                <div style="background: white; padding: 20px; border-radius: 8px; text-align: center; margin: 20px 0;">
+                    <h1 style="color: #667eea; letter-spacing: 8px; margin: 0; font-size: 36px;">{code}</h1>
+                </div>
+                <p style="color: #999; font-size: 14px;">Код действителен в течение 10 минут.</p>
+                <p style="color: #999; font-size: 12px; margin-top: 30px;">Если вы не запрашивали этот код, проигнорируйте это письмо.</p>
+            </div>
+        </body>
         </html>
         """
         
@@ -147,29 +144,25 @@ def send_email(email: str, code: str, purpose: str = 'verification') -> bool:
         msg.attach(part1)
         msg.attach(part2)
         
-        # Отправляем письмо
         if smtp_port == 465:
-            # SSL
             with smtplib.SMTP_SSL(smtp_host, smtp_port, timeout=30) as server:
-                server.set_debuglevel(0)
                 server.login(smtp_email, smtp_password)
                 server.send_message(msg)
-                print('Email sent successfully via SSL')
         else:
-            # TLS (для порта 587)
             with smtplib.SMTP(smtp_host, smtp_port, timeout=30) as server:
-                server.set_debuglevel(0)
                 server.starttls()
                 server.login(smtp_email, smtp_password)
                 server.send_message(msg)
-                print('Email sent successfully via TLS')
         
-        return True
+        print(f'✅ Email отправлен на {email}')
+        return True, 'Email отправлен'
+        
+    except smtplib.SMTPAuthenticationError:
+        print('❌ SMTP ошибка аутентификации')
+        return False, 'Неверный логин или пароль SMTP'
     except Exception as e:
-        print(f'Email sending failed: {e}')
-        import traceback
-        traceback.print_exc()
-        return False
+        print(f'❌ Ошибка отправки email: {e}')
+        return False, f'Ошибка отправки email: {str(e)}'
 
 
 def validate_email(email: str) -> bool:
@@ -180,32 +173,25 @@ def validate_email(email: str) -> bool:
 
 def validate_phone(phone: str) -> bool:
     """Проверяет валидность номера телефона (российский формат)"""
+    phone_clean = phone.replace(' ', '').replace('-', '').replace('(', '').replace(')', '')
     pattern = r'^\+?[78]?9\d{9}$'
-    return bool(re.match(pattern, phone.replace(' ', '').replace('-', '').replace('(', '').replace(')', '')))
+    return bool(re.match(pattern, phone_clean))
 
 
 def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     """
-    API аутентификации и регистрации пользователей
-    
-    Эндпоинты:
-    - POST /register - Регистрация нового пользователя
-    - POST /verify - Подтверждение кода верификации
-    - POST /login - Вход в систему
-    - POST /reset-password - Запрос на сброс пароля
-    - POST /confirm-reset - Подтверждение сброса пароля с новым паролем
-    - GET /user/:id - Получение данных пользователя
+    API аутентификации и регистрации
+    Endpoints: register, verify, login, reset-password, confirm-reset, link-email, verify-email-link
     """
     method = event.get('httpMethod', 'GET')
     
-    # CORS
     if method == 'OPTIONS':
         return {
             'statusCode': 200,
             'headers': {
                 'Access-Control-Allow-Origin': '*',
-                'Access-Control-Allow-Methods': 'GET, POST, PUT, OPTIONS',
-                'Access-Control-Allow-Headers': 'Content-Type, X-User-Id',
+                'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+                'Access-Control-Allow-Headers': 'Content-Type',
                 'Access-Control-Max-Age': '86400'
             },
             'body': '',
@@ -213,12 +199,9 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         }
     
     try:
-        # Парсим тело запроса
         body = json.loads(event.get('body', '{}')) if method == 'POST' else {}
-        # Получаем путь из query параметров
         path = event.get('queryStringParameters', {}).get('path', '') if event.get('queryStringParameters') else ''
         
-        # Роутинг
         if method == 'POST' and 'register' in path:
             return register_user(body)
         elif method == 'POST' and 'verify-email-link' in path:
@@ -244,6 +227,9 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             }
             
     except Exception as e:
+        print(f'Error: {e}')
+        import traceback
+        traceback.print_exc()
         return {
             'statusCode': 500,
             'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
@@ -259,9 +245,8 @@ def register_user(data: Dict[str, Any]) -> Dict[str, Any]:
     phone = data.get('phone', '').strip()
     password = data.get('password', '').strip()
     role = data.get('role', 'seeker')
-    verification_type = data.get('verification_type', 'email')  # 'email' или 'sms'
+    verification_type = data.get('verification_type', 'email')
     
-    # Валидация
     if not name or len(name) < 2:
         return {
             'statusCode': 400,
@@ -278,7 +263,6 @@ def register_user(data: Dict[str, Any]) -> Dict[str, Any]:
             'isBase64Encoded': False
         }
     
-    # Проверяем email или phone
     if verification_type == 'email':
         if not email or not validate_email(email):
             return {
@@ -302,7 +286,6 @@ def register_user(data: Dict[str, Any]) -> Dict[str, Any]:
     cur = conn.cursor(cursor_factory=RealDictCursor)
     
     try:
-        # Проверяем существование пользователя
         if email:
             cur.execute('SELECT id FROM users WHERE email = %s', (email,))
             if cur.fetchone():
@@ -323,9 +306,7 @@ def register_user(data: Dict[str, Any]) -> Dict[str, Any]:
                     'isBase64Encoded': False
                 }
         
-        # Создаем пользователя
         password_hash = hash_password(password)
-        # Новые пользователи начинают с нулевым балансом и FREE тарифом
         
         cur.execute("""
             INSERT INTO users (name, email, phone, password_hash, role, balance, tier)
@@ -335,7 +316,6 @@ def register_user(data: Dict[str, Any]) -> Dict[str, Any]:
         
         user_id = cur.fetchone()['id']
         
-        # Генерируем и сохраняем код верификации
         code = generate_code()
         expires_at = datetime.now() + timedelta(minutes=10)
         
@@ -346,40 +326,21 @@ def register_user(data: Dict[str, Any]) -> Dict[str, Any]:
         
         conn.commit()
         
-        # Отправляем код
-        sent = False
-        error_message = None
         if verification_type == 'email':
-            sent = send_email(email, code)
-            if not sent:
-                error_message = 'Не удалось отправить email. Проверьте адрес почты.'
+            success, message = send_email(email, code)
         else:
-            sent = send_sms(phone, code)
-            if not sent:
-                error_message = 'SMS-сервис временно недоступен. Попробуйте регистрацию через email или обратитесь в поддержку.'
-        
-        # Логируем код для отладки (только если не отправилось)
-        if not sent:
-            print(f'⚠️ Verification code for {contact}: {code} (valid for 10 minutes)')
-        
-        response_data = {
-            'success': True,
-            'user_id': str(user_id),
-            'verification_required': True,
-            'code_sent': sent,
-            'message': f'Код отправлен на {contact}' if sent else error_message,
-            'hint': 'Используйте email для регистрации' if not sent and verification_type == 'sms' else None
-        }
-        
-        # Режим разработки: если код не отправился - включаем его в ответ
-        if not sent:
-            response_data['dev_code'] = code
-            response_data['message'] = f'Режим разработки: используйте код {code}'
+            success, message = send_sms(phone, code)
         
         return {
             'statusCode': 201,
             'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
-            'body': json.dumps(response_data),
+            'body': json.dumps({
+                'success': True,
+                'user_id': str(user_id),
+                'verification_required': True,
+                'code_sent': success,
+                'message': f'Код отправлен на {contact}' if success else message
+            }),
             'isBase64Encoded': False
         }
         
@@ -408,7 +369,6 @@ def verify_code(data: Dict[str, Any]) -> Dict[str, Any]:
     cur = conn.cursor(cursor_factory=RealDictCursor)
     
     try:
-        # Ищем код
         cur.execute("""
             SELECT * FROM verification_codes
             WHERE user_id = %s AND code = %s AND used = FALSE AND expires_at > NOW()
@@ -426,16 +386,13 @@ def verify_code(data: Dict[str, Any]) -> Dict[str, Any]:
                 'isBase64Encoded': False
             }
         
-        # Помечаем код использованным
         cur.execute('UPDATE verification_codes SET used = TRUE WHERE id = %s', (verification['id'],))
         
-        # Обновляем статус верификации пользователя
         if verification['type'] == 'email':
             cur.execute('UPDATE users SET email_verified = TRUE WHERE id = %s', (user_id,))
         elif verification['type'] == 'sms':
             cur.execute('UPDATE users SET phone_verified = TRUE WHERE id = %s', (user_id,))
         
-        # Получаем данные пользователя
         cur.execute("""
             SELECT id, name, email, phone, role, balance, tier, vacancies_this_month,
                    email_verified, phone_verified
@@ -476,7 +433,7 @@ def verify_code(data: Dict[str, Any]) -> Dict[str, Any]:
 
 def login_user(data: Dict[str, Any]) -> Dict[str, Any]:
     """Вход пользователя по email/phone и паролю"""
-    login = data.get('login', '').strip().lower()  # email или phone
+    login = data.get('login', '').strip().lower()
     password = data.get('password', '').strip()
     
     if not login or not password:
@@ -491,7 +448,6 @@ def login_user(data: Dict[str, Any]) -> Dict[str, Any]:
     cur = conn.cursor(cursor_factory=RealDictCursor)
     
     try:
-        # Ищем пользователя по email или phone
         cur.execute("""
             SELECT id, name, email, phone, password_hash, role, balance, tier,
                    vacancies_this_month, email_verified, phone_verified
@@ -509,20 +465,16 @@ def login_user(data: Dict[str, Any]) -> Dict[str, Any]:
                 'isBase64Encoded': False
             }
         
-        # Проверяем пароль (поддержка старых SHA-256 и новых bcrypt паролей)
         password_hash = user['password_hash']
         is_valid = False
         
         if password_hash.startswith('$2b$'):
-            # Новый bcrypt пароль
             is_valid = verify_password(password, password_hash)
         else:
-            # Старый SHA-256 пароль (обратная совместимость)
             import hashlib
             old_hash = hashlib.sha256(password.encode()).hexdigest()
             is_valid = (old_hash == password_hash)
             
-            # Автоматически обновляем на bcrypt при входе
             if is_valid:
                 new_hash = hash_password(password)
                 cur.execute('UPDATE users SET password_hash = %s WHERE id = %s', (new_hash, user['id']))
@@ -563,9 +515,9 @@ def login_user(data: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def reset_password(data: Dict[str, Any]) -> Dict[str, Any]:
-    """Запрос на сброс пароля - отправка кода"""
-    contact = data.get('contact', '').strip().lower()  # email или phone
-    reset_type = data.get('type', 'email')  # 'email' или 'sms'
+    """Запрос на сброс пароля"""
+    contact = data.get('contact', '').strip().lower()
+    reset_type = data.get('type', 'email')
     
     if not contact:
         return {
@@ -579,7 +531,6 @@ def reset_password(data: Dict[str, Any]) -> Dict[str, Any]:
     cur = conn.cursor(cursor_factory=RealDictCursor)
     
     try:
-        # Ищем пользователя
         cur.execute("""
             SELECT id FROM users WHERE email = %s OR phone = %s
         """, (contact, contact))
@@ -587,7 +538,6 @@ def reset_password(data: Dict[str, Any]) -> Dict[str, Any]:
         user = cur.fetchone()
         
         if not user:
-            # Не раскрываем существование пользователя
             return {
                 'statusCode': 200,
                 'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
@@ -598,7 +548,6 @@ def reset_password(data: Dict[str, Any]) -> Dict[str, Any]:
                 'isBase64Encoded': False
             }
         
-        # Генерируем код
         code = generate_code()
         expires_at = datetime.now() + timedelta(minutes=10)
         
@@ -609,12 +558,12 @@ def reset_password(data: Dict[str, Any]) -> Dict[str, Any]:
         
         conn.commit()
         
-        # Отправляем код
-        sent = False
         if reset_type == 'email' and validate_email(contact):
-            sent = send_email(contact, code, 'password_reset')
+            success, message = send_email(contact, code, 'password_reset')
         elif reset_type == 'sms' and validate_phone(contact):
-            sent = send_sms(contact, code)
+            success, message = send_sms(contact, code)
+        else:
+            success, message = False, 'Некорректный формат контакта'
         
         return {
             'statusCode': 200,
@@ -622,8 +571,8 @@ def reset_password(data: Dict[str, Any]) -> Dict[str, Any]:
             'body': json.dumps({
                 'success': True,
                 'user_id': str(user['id']),
-                'code_sent': sent,
-                'message': f'Код отправлен на {contact}' if sent else f'Не удалось отправить код. Проверьте {contact}'
+                'code_sent': success,
+                'message': f'Код отправлен на {contact}' if success else message
             }),
             'isBase64Encoded': False
         }
@@ -637,7 +586,7 @@ def reset_password(data: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def confirm_reset(data: Dict[str, Any]) -> Dict[str, Any]:
-    """Подтверждение сброса пароля с новым паролем"""
+    """Подтверждение сброса пароля"""
     user_id = data.get('user_id')
     code = data.get('code', '').strip()
     new_password = data.get('new_password', '').strip()
@@ -662,7 +611,6 @@ def confirm_reset(data: Dict[str, Any]) -> Dict[str, Any]:
     cur = conn.cursor(cursor_factory=RealDictCursor)
     
     try:
-        # Проверяем код
         cur.execute("""
             SELECT * FROM verification_codes
             WHERE user_id = %s AND code = %s AND type = 'password_reset'
@@ -681,11 +629,8 @@ def confirm_reset(data: Dict[str, Any]) -> Dict[str, Any]:
                 'isBase64Encoded': False
             }
         
-        # Обновляем пароль
         password_hash = hash_password(new_password)
         cur.execute('UPDATE users SET password_hash = %s WHERE id = %s', (password_hash, user_id))
-        
-        # Помечаем код использованным
         cur.execute('UPDATE verification_codes SET used = TRUE WHERE id = %s', (verification['id'],))
         
         conn.commit()
@@ -733,7 +678,6 @@ def link_email(data: Dict[str, Any]) -> Dict[str, Any]:
     cur = conn.cursor(cursor_factory=RealDictCursor)
     
     try:
-        # Проверяем существование пользователя
         cur.execute('SELECT id, email FROM users WHERE id = %s', (user_id,))
         user = cur.fetchone()
         
@@ -753,7 +697,6 @@ def link_email(data: Dict[str, Any]) -> Dict[str, Any]:
                 'isBase64Encoded': False
             }
         
-        # Проверяем, не занят ли email другим пользователем
         cur.execute('SELECT id FROM users WHERE email = %s', (email,))
         if cur.fetchone():
             return {
@@ -763,7 +706,6 @@ def link_email(data: Dict[str, Any]) -> Dict[str, Any]:
                 'isBase64Encoded': False
             }
         
-        # Генерируем код
         code = generate_code()
         expires_at = datetime.now() + timedelta(minutes=10)
         
@@ -774,16 +716,15 @@ def link_email(data: Dict[str, Any]) -> Dict[str, Any]:
         
         conn.commit()
         
-        # Отправляем код
-        sent = send_email(email, code, 'verification')
+        success, message = send_email(email, code, 'verification')
         
         return {
             'statusCode': 200,
             'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
             'body': json.dumps({
                 'success': True,
-                'code_sent': sent,
-                'message': f'Код отправлен на {email}' if sent else 'Используйте код: ' + code
+                'code_sent': success,
+                'message': f'Код отправлен на {email}' if success else message
             }),
             'isBase64Encoded': False
         }
@@ -813,7 +754,6 @@ def verify_email_link(data: Dict[str, Any]) -> Dict[str, Any]:
     cur = conn.cursor(cursor_factory=RealDictCursor)
     
     try:
-        # Ищем код
         cur.execute("""
             SELECT * FROM verification_codes
             WHERE user_id = %s AND code = %s AND type = 'email' 
@@ -834,14 +774,12 @@ def verify_email_link(data: Dict[str, Any]) -> Dict[str, Any]:
         
         email = verification['contact']
         
-        # Привязываем email к пользователю
         cur.execute("""
             UPDATE users 
             SET email = %s, email_verified = TRUE 
             WHERE id = %s
         """, (email, user_id))
         
-        # Помечаем код использованным
         cur.execute('UPDATE verification_codes SET used = TRUE WHERE id = %s', (verification['id'],))
         
         conn.commit()
