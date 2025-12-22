@@ -134,6 +134,29 @@ export default function Index() {
   const [swipeOffset, setSwipeOffset] = useState(0);
   const [swipeDirection, setSwipeDirection] = useState<'up' | 'down' | null>(null);
 
+  // Загрузка пользователя из localStorage при монтировании
+  useEffect(() => {
+    const savedUser = localStorage.getItem('currentUser');
+    if (savedUser) {
+      try {
+        const user = JSON.parse(savedUser);
+        setCurrentUser(user);
+      } catch (error) {
+        console.error('Ошибка загрузки пользователя:', error);
+        localStorage.removeItem('currentUser');
+      }
+    }
+  }, []);
+
+  // Сохранение пользователя в localStorage при изменении
+  useEffect(() => {
+    if (currentUser) {
+      localStorage.setItem('currentUser', JSON.stringify(currentUser));
+    } else {
+      localStorage.removeItem('currentUser');
+    }
+  }, [currentUser]);
+
   // Загрузка сохраненного города из localStorage
   useEffect(() => {
     const savedCity = localStorage.getItem('selectedCity');
