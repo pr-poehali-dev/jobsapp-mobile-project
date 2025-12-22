@@ -443,8 +443,10 @@ def verify_code(data: Dict[str, Any]) -> Dict[str, Any]:
 
 def login_user(data: Dict[str, Any]) -> Dict[str, Any]:
     """Вход пользователя по email/phone и паролю"""
-    login = data.get('login', '').strip().lower()
+    login = data.get('login', '').strip()
     password = data.get('password', '').strip()
+    
+    print(f'🔑 Попытка входа: login={login}')
     
     if not login or not password:
         return {
@@ -453,6 +455,14 @@ def login_user(data: Dict[str, Any]) -> Dict[str, Any]:
             'body': json.dumps({'error': 'Укажите логин и пароль'}),
             'isBase64Encoded': False
         }
+    
+    # Нормализуем логин
+    if validate_phone(login):
+        login_normalized = normalize_phone(login)
+        print(f'📱 Нормализован телефон: {login_normalized}')
+    else:
+        login_normalized = login.lower()
+        print(f'📧 Email: {login_normalized}')
     
     conn = get_db_connection()
     cur = conn.cursor(cursor_factory=RealDictCursor)
@@ -463,11 +473,14 @@ def login_user(data: Dict[str, Any]) -> Dict[str, Any]:
                    vacancies_this_month, email_verified, phone_verified
             FROM users
             WHERE email = %s OR phone = %s
-        """, (login, login))
+        """, (login_normalized, login_normalized))
+        
+        print(f'🔍 Поиск пользователя: {login_normalized}')
         
         user = cur.fetchone()
         
         if not user:
+            print(f'❌ Пользователь не найден: {login_normalized}')
             return {
                 'statusCode': 401,
                 'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
@@ -475,22 +488,30 @@ def login_user(data: Dict[str, Any]) -> Dict[str, Any]:
                 'isBase64Encoded': False
             }
         
+        print(f'✅ Пользователь найден: user_id={user["id"]}, имеет хеш: {user["password_hash"][:20]}...')
+        
         password_hash = user['password_hash']
         is_valid = False
         
         if password_hash.startswith('$2b$'):
+            print(f'🔐 Проверка bcrypt хеша...')
             is_valid = verify_password(password, password_hash)
+            print(f'{"✅" if is_valid else "❌"} Результат проверки bcrypt: {is_valid}')
         else:
+            print(f'🔐 Проверка старого SHA256 хеша...')
             import hashlib
             old_hash = hashlib.sha256(password.encode()).hexdigest()
             is_valid = (old_hash == password_hash)
+            print(f'{"✅" if is_valid else "❌"} Результат проверки SHA256: {is_valid}')
             
             if is_valid:
+                print(f'🔄 Обновление хеша на bcrypt...')
                 new_hash = hash_password(password)
                 cur.execute('UPDATE users SET password_hash = %s WHERE id = %s', (new_hash, user['id']))
                 conn.commit()
         
         if not is_valid:
+            print(f'❌ Неверный пароль для пользователя {user["id"]}')
             return {
                 'statusCode': 401,
                 'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
