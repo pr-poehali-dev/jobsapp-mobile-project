@@ -1558,7 +1558,23 @@ function VacancyDialog({ open, onClose, onCreate }: { open: boolean; onClose: ()
           </div>
           <div>
             <Label>Зарплата</Label>
-            <Input placeholder="50 000 - 70 000 ₽" value={vacancy.salary} onChange={(e) => setVacancy({ ...vacancy, salary: e.target.value })} />
+            <Input 
+              placeholder="50 000 - 70 000" 
+              value={vacancy.salary} 
+              onChange={(e) => {
+                let value = e.target.value.replace(/₽/g, '').trim();
+                if (value && !value.endsWith('₽')) {
+                  value = value + ' ₽';
+                }
+                setVacancy({ ...vacancy, salary: value });
+              }}
+              onBlur={(e) => {
+                const value = e.target.value.replace(/₽/g, '').trim();
+                if (value) {
+                  setVacancy({ ...vacancy, salary: value + ' ₽' });
+                }
+              }}
+            />
           </div>
           <div>
             <Label>Город</Label>
