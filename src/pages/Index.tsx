@@ -386,24 +386,28 @@ export default function Index() {
 
     try {
       // Отправляем вакансию в БД через API
+      const payload = {
+        user_id: currentUser.id,
+        title: vacancy.title || '',
+        description: vacancy.description || '',
+        salary: vacancy.salary || '',
+        city: vacancy.city || '',
+        phone: vacancy.phone || currentUser.phone || '+7',
+        employer_name: currentUser.name,
+        employer_tier: isAdmin ? 'PREMIUM' : currentUser.tier,
+        tags: vacancy.tags || []
+      };
+      
+      console.log('Creating vacancy with payload:', payload);
+      
       const response = await fetch(`${ADMIN_API}?path=vacancies`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          user_id: currentUser.id,
-          title: vacancy.title || '',
-          description: vacancy.description || '',
-          salary: vacancy.salary || '',
-          city: vacancy.city || '',
-          phone: vacancy.phone || currentUser.phone || '',
-          employer_name: currentUser.name,
-          employer_tier: isAdmin ? 'PREMIUM' : currentUser.tier,
-          tags: vacancy.tags || []
-          // status определяется на backend в зависимости от тарифа
-        })
+        body: JSON.stringify(payload)
       });
 
       const data = await response.json();
+      console.log('Backend response:', data);
 
       if (data.success) {
         // Увеличиваем счетчик вакансий (админы тоже считаются)
@@ -1348,7 +1352,7 @@ function VacancyDialog({ open, onClose, onCreate }: { open: boolean; onClose: ()
             </div>
           </div>
           <Button className="w-full" onClick={() => onCreate(vacancy)}>
-            Создать объявление (50 ₽)
+            Создать объявление
           </Button>
         </div>
       </DialogContent>

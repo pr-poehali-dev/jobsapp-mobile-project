@@ -294,9 +294,9 @@ def create_vacancy(event: Dict[str, Any], conn, context: Any) -> Dict[str, Any]:
             if user['vacancies_this_month'] >= limit:
                 return error_response(403, f'Лимит вакансий исчерпан ({limit} в месяц для тарифа {user["tier"]})')
         
-        # Генерируем ID вакансии с текущим timestamp
-        import time
-        vacancy_id = f"vac_{body['user_id']}_{int(time.time() * 1000)}"
+        # Генерируем UUID для вакансии
+        import uuid
+        vacancy_id = str(uuid.uuid4())
         
         # Определяем статус: PREMIUM тариф и админы публикуют сразу, остальные на модерацию
         status = body.get('status', 'published' if (user['tier'] == 'PREMIUM' or user['role'] == 'admin') else 'pending')
