@@ -1603,6 +1603,9 @@ function VacancyDialog({ open, onClose, onCreate }: { open: boolean; onClose: ()
                 }
               }}
             />
+            <p className="text-sm text-muted-foreground mt-1">
+              Примеры: <span className="text-foreground">50 000</span>, <span className="text-foreground">от 40 000</span>, <span className="text-foreground">30 000 - 50 000</span>
+            </p>
           </div>
           <div>
             <Label>Город</Label>
