@@ -325,15 +325,29 @@ def create_vacancy(event: Dict[str, Any], conn, context: Any) -> Dict[str, Any]:
             body.get('source', 'manual')
         ))
         
-        conn.commit()
         vacancy = cur.fetchone()
+        
+        # Увеличиваем счетчик вакансий пользователя (для не-админов)
+        if user['role'] != 'admin':
+            cur.execute("""
+                UPDATE users 
+                SET vacancies_this_month = vacancies_this_month + 1
+                WHERE id = %s
+                RETURNING vacancies_this_month
+            """, (body['user_id'],))
+            updated_count = cur.fetchone()['vacancies_this_month']
+        else:
+            updated_count = user['vacancies_this_month']
+        
+        conn.commit()
         
         return {
             'statusCode': 201,
             'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
             'body': json.dumps({
                 'success': True,
-                'vacancy': dict(vacancy)
+                'vacancy': dict(vacancy),
+                'vacancies_this_month': updated_count
             }, default=str),
             'isBase64Encoded': False
         }
@@ -394,15 +408,31 @@ def delete_vacancy(event: Dict[str, Any], conn) -> Dict[str, Any]:
         return error_response(400, 'vacancy_id required')
     
     with conn.cursor(cursor_factory=RealDictCursor) as cur:
-        # Проверяем существование вакансии
-        cur.execute('SELECT id, title FROM vacancies WHERE id = %s', (vacancy_id,))
+        # Проверяем существование вакансии и получаем user_id
+        cur.execute('SELECT id, title, user_id FROM vacancies WHERE id = %s', (vacancy_id,))
         vacancy = cur.fetchone()
         
         if not vacancy:
             return error_response(404, 'Vacancy not found')
         
+        # Получаем информацию о пользователе
+        cur.execute('SELECT role, vacancies_this_month FROM users WHERE id = %s', (vacancy['user_id'],))
+        user = cur.fetchone()
+        
         # Удаляем вакансию
         cur.execute('DELETE FROM vacancies WHERE id = %s', (vacancy_id,))
+        
+        # Уменьшаем счетчик вакансий (только для не-админов и если счетчик > 0)
+        vacancies_count = user['vacancies_this_month'] if user else 0
+        if user and user['role'] != 'admin' and user['vacancies_this_month'] > 0:
+            cur.execute("""
+                UPDATE users 
+                SET vacancies_this_month = vacancies_this_month - 1
+                WHERE id = %s
+                RETURNING vacancies_this_month
+            """, (vacancy['user_id'],))
+            vacancies_count = cur.fetchone()['vacancies_this_month']
+        
         conn.commit()
         
         return {
@@ -410,7 +440,8 @@ def delete_vacancy(event: Dict[str, Any], conn) -> Dict[str, Any]:
             'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
             'body': json.dumps({
                 'success': True,
-                'message': f'Вакансия "{vacancy["title"]}" успешно удалена'
+                'message': f'Вакансия "{vacancy["title"]}" успешно удалена',
+                'vacancies_this_month': vacancies_count
             }),
             'isBase64Encoded': False
         }

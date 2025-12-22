@@ -411,10 +411,11 @@ export default function Index() {
       console.log('Backend response:', data);
 
       if (data.success) {
-        // Увеличиваем счетчик вакансий (админы тоже считаются)
-        if (!isAdmin) {
-          setCurrentUser({ ...currentUser, vacanciesThisMonth: currentUser.vacanciesThisMonth + 1 });
-        }
+        // Обновляем счетчик вакансий из ответа бэкенда
+        setCurrentUser({ 
+          ...currentUser, 
+          vacanciesThisMonth: data.vacancies_this_month 
+        });
         
         setShowVacancyDialog(false);
 
@@ -445,6 +446,8 @@ export default function Index() {
   };
 
   const handleDeleteEmployerVacancy = async (vacancyId: string) => {
+    if (!currentUser) return;
+    
     try {
       const response = await fetch(`${ADMIN_API}?path=vacancies`, {
         method: 'DELETE',
@@ -453,6 +456,12 @@ export default function Index() {
       });
       const data = await response.json();
       if (data.success) {
+        // Обновляем счетчик вакансий из ответа бэкенда
+        setCurrentUser({ 
+          ...currentUser, 
+          vacanciesThisMonth: data.vacancies_this_month 
+        });
+        
         toast({ title: 'Вакансия удалена' });
         loadEmployerVacancies();
         loadPublishedVacancies();
@@ -796,6 +805,11 @@ export default function Index() {
           setShowProfileDialog(false);
           setShowLinkEmailDialog(true);
         }}
+        onUpdateVacanciesCount={(count: number) => {
+          if (currentUser) {
+            setCurrentUser({ ...currentUser, vacanciesThisMonth: count });
+          }
+        }}
       />
       <PaymentDialog open={showBalanceDialog} onClose={() => setShowBalanceDialog(false)} userId={currentUser?.id || ''} />
       <LinkEmailDialog 
@@ -928,7 +942,7 @@ function VacancyCard({ vacancy, currentUser, onAuthClick }: { vacancy: Vacancy; 
   );
 }
 
-function ProfileDialog({ open, onClose, user, onAddBalance, onSelectTier, onCreateVacancy, onLinkEmail }: { open: boolean; onClose: () => void; user: User | null; onAddBalance: () => void; onSelectTier: () => void; onCreateVacancy?: () => void; onLinkEmail: () => void }) {
+function ProfileDialog({ open, onClose, user, onAddBalance, onSelectTier, onCreateVacancy, onLinkEmail, onUpdateVacanciesCount }: { open: boolean; onClose: () => void; user: User | null; onAddBalance: () => void; onSelectTier: () => void; onCreateVacancy?: () => void; onLinkEmail: () => void; onUpdateVacanciesCount: (count: number) => void }) {
   const [userVacancies, setUserVacancies] = useState<Vacancy[]>([]);
   const [isLoadingVacancies, setIsLoadingVacancies] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
@@ -978,6 +992,9 @@ function ProfileDialog({ open, onClose, user, onAddBalance, onSelectTier, onCrea
       });
       const data = await response.json();
       if (data.success) {
+        // Обновляем счетчик вакансий
+        onUpdateVacanciesCount(data.vacancies_this_month);
+        
         toast({
           title: 'Успешно',
           description: 'Вакансия удалена'
