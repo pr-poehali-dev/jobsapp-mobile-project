@@ -362,17 +362,24 @@ def register_user(data: Dict[str, Any]) -> Dict[str, Any]:
         if not sent:
             print(f'⚠️ Verification code for {contact}: {code} (valid for 10 minutes)')
         
+        response_data = {
+            'success': True,
+            'user_id': str(user_id),
+            'verification_required': True,
+            'code_sent': sent,
+            'message': f'Код отправлен на {contact}' if sent else error_message,
+            'hint': 'Используйте email для регистрации' if not sent and verification_type == 'sms' else None
+        }
+        
+        # Режим разработки: если код не отправился - включаем его в ответ
+        if not sent:
+            response_data['dev_code'] = code
+            response_data['message'] = f'Режим разработки: используйте код {code}'
+        
         return {
             'statusCode': 201,
             'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
-            'body': json.dumps({
-                'success': True,
-                'user_id': str(user_id),
-                'verification_required': True,
-                'code_sent': sent,
-                'message': f'Код отправлен на {contact}' if sent else error_message,
-                'hint': 'Используйте email для регистрации' if not sent and verification_type == 'sms' else None
-            }),
+            'body': json.dumps(response_data),
             'isBase64Encoded': False
         }
         
