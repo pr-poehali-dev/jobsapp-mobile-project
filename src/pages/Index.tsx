@@ -1391,7 +1391,96 @@ function AdminDialog({
   onApprove: (id: string) => void;
   onReject: (id: string) => void;
 }) {
-  const pendingVacancies = vacancies.filter((v) => v.status === 'pending');
+  const [pendingVacancies, setPendingVacancies] = useState<Vacancy[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+
+  const loadPendingVacancies = async () => {
+    setIsLoading(true);
+    try {
+      const response = await fetch(`${ADMIN_API}?path=vacancies&status=pending&limit=100`);
+      const data = await response.json();
+      
+      if (data.success && data.vacancies) {
+        const pending = data.vacancies.map((v: any) => ({
+          id: v.id,
+          title: v.title,
+          description: v.description,
+          salary: v.salary,
+          city: v.city,
+          phone: v.phone,
+          employerName: v.employer_name,
+          employerTier: v.employer_tier,
+          tags: v.tags || [],
+          status: 'pending' as const,
+          source: 'database' as const
+        }));
+        setPendingVacancies(pending);
+      }
+    } catch (error) {
+      console.error('Ошибка загрузки вакансий на модерации:', error);
+      toast({
+        title: 'Ошибка',
+        description: 'Не удалось загрузить вакансии на модерации',
+        variant: 'destructive'
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (open) {
+      loadPendingVacancies();
+    }
+  }, [open]);
+
+  const handleApprove = async (id: string) => {
+    try {
+      const response = await fetch(`${ADMIN_API}?path=moderate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ vacancy_id: id, action: 'approve' })
+      });
+      const data = await response.json();
+      if (data.success) {
+        toast({ title: 'Объявление одобрено' });
+        loadPendingVacancies();
+        onApprove(id);
+      } else {
+        throw new Error(data.error);
+      }
+    } catch (error: any) {
+      toast({
+        title: 'Ошибка',
+        description: error.message || 'Не удалось одобрить вакансию',
+        variant: 'destructive'
+      });
+    }
+  };
+
+  const handleReject = async (id: string) => {
+    try {
+      const response = await fetch(`${ADMIN_API}?path=moderate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ vacancy_id: id, action: 'reject' })
+      });
+      const data = await response.json();
+      if (data.success) {
+        toast({ title: 'Объявление отклонено' });
+        loadPendingVacancies();
+        onReject(id);
+      } else {
+        throw new Error(data.error);
+      }
+    } catch (error: any) {
+      toast({
+        title: 'Ошибка',
+        description: error.message || 'Не удалось отклонить вакансию',
+        variant: 'destructive'
+      });
+    }
+  };
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
@@ -1401,7 +1490,11 @@ function AdminDialog({
           <DialogDescription>Модерация объявлений ({pendingVacancies.length})</DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
-          {pendingVacancies.length === 0 ? (
+          {isLoading ? (
+            <div className="text-center py-8">
+              <Icon name="Loader2" size={32} className="animate-spin mx-auto text-muted-foreground" />
+            </div>
+          ) : pendingVacancies.length === 0 ? (
             <p className="text-center text-muted-foreground py-8">Нет объявлений на модерации</p>
           ) : (
             pendingVacancies.map((vacancy) => (
@@ -1414,19 +1507,29 @@ function AdminDialog({
                 </CardHeader>
                 <CardContent className="space-y-3">
                   <p className="text-sm">{vacancy.description}</p>
-                  <div className="flex gap-2">
+                  <div className="flex gap-2 flex-wrap">
                     {vacancy.tags.map((tag) => (
                       <Badge key={tag} variant="outline">
                         {tag}
                       </Badge>
                     ))}
                   </div>
+                  <div className="pt-2 border-t space-y-1 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Зарплата:</span>
+                      <span className="font-medium">{vacancy.salary}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Телефон:</span>
+                      <span className="font-medium">{vacancy.phone}</span>
+                    </div>
+                  </div>
                   <div className="flex gap-2">
-                    <Button size="sm" onClick={() => onApprove(vacancy.id)}>
+                    <Button size="sm" onClick={() => handleApprove(vacancy.id)} className="flex-1">
                       <Icon name="Check" size={16} className="mr-1" />
                       Одобрить
                     </Button>
-                    <Button size="sm" variant="destructive" onClick={() => onReject(vacancy.id)}>
+                    <Button size="sm" variant="destructive" onClick={() => handleReject(vacancy.id)} className="flex-1">
                       <Icon name="X" size={16} className="mr-1" />
                       Отклонить
                     </Button>
