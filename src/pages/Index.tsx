@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -291,6 +291,24 @@ export default function Index() {
     };
   }, []);
 
+  const filteredVacancies = useMemo(() => {
+    return vacancies.filter((v) => {
+      if (v.status !== 'published') return false;
+      if (searchQuery && !v.title.toLowerCase().includes(searchQuery.toLowerCase())) return false;
+      if (selectedTags.length > 0 && !selectedTags.some((tag) => v.tags.includes(tag))) return false;
+      if (selectedCity && v.city !== selectedCity) return false;
+      return true;
+    }).sort((a, b) => {
+      // Сортировка: PREMIUM > VIP > ECONOM
+      const tierOrder: Record<string, number> = {
+        'PREMIUM': 3,
+        'VIP': 2,
+        'ECONOM': 1
+      };
+      return (tierOrder[b.employerTier] || 0) - (tierOrder[a.employerTier] || 0);
+    });
+  }, [vacancies, searchQuery, selectedTags, selectedCity]);
+
   const handleSwipeNext = () => {
     if (currentVacancyIndex < filteredVacancies.length - 1) {
       setCurrentVacancyIndex(currentVacancyIndex + 1);
@@ -444,22 +462,6 @@ export default function Index() {
       });
     }
   };
-
-  const filteredVacancies = vacancies.filter((v) => {
-    if (v.status !== 'published') return false;
-    if (searchQuery && !v.title.toLowerCase().includes(searchQuery.toLowerCase())) return false;
-    if (selectedTags.length > 0 && !selectedTags.some((tag) => v.tags.includes(tag))) return false;
-    if (selectedCity && v.city !== selectedCity) return false;
-    return true;
-  }).sort((a, b) => {
-    // Сортировка: PREMIUM > VIP > ECONOM
-    const tierOrder: Record<string, number> = {
-      'PREMIUM': 3,
-      'VIP': 2,
-      'ECONOM': 1
-    };
-    return (tierOrder[b.employerTier] || 0) - (tierOrder[a.employerTier] || 0);
-  });
 
   const currentVacancy = filteredVacancies[currentVacancyIndex];
 
