@@ -505,12 +505,12 @@ export default function Index() {
   return (
     <div className="min-h-screen bg-background flex flex-col">
       <header className="sticky top-0 z-50 bg-accent text-accent-foreground shadow-md">
-        <div className="container mx-auto px-4 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Icon name="Briefcase" size={24} />
-            <h1 className="text-xl font-bold">Jobs-App</h1>
+        <div className="container mx-auto px-2 md:px-4 py-1 md:py-3 flex items-center justify-between">
+          <div className="flex items-center gap-1 md:gap-2">
+            <Icon name="Briefcase" size={16} className="md:w-6 md:h-6" />
+            <h1 className="text-sm md:text-xl font-bold">Jobs-App</h1>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1 md:gap-2">
             {currentUser ? (
               currentUser.role === 'admin' ? (
                 <>
@@ -525,10 +525,10 @@ export default function Index() {
                     size="sm" 
                     variant="outline" 
                     onClick={() => setShowAdminDialog(true)}
-                    className="bg-white text-gray-900 border-gray-300 hover:bg-gray-50"
+                    className="bg-white text-gray-900 border-gray-300 hover:bg-gray-50 text-xs md:text-sm px-2 md:px-3 h-7 md:h-9"
                   >
-                    <Icon name="Shield" size={16} className="mr-2" />
-                    Админка
+                    <Icon name="Shield" size={14} className="mr-1 md:mr-2 md:w-4 md:h-4" />
+                    <span className="hidden md:inline">Админка</span>
                   </Button>
                 </>
               ) : (
@@ -578,14 +578,14 @@ export default function Index() {
                     size="icon" 
                     variant="outline" 
                     onClick={() => setShowProfileDialog(true)}
-                    className="md:hidden rounded-full h-10 w-10 bg-white text-gray-900 border-gray-300 hover:bg-gray-50"
+                    className="md:hidden rounded-full h-7 w-7 md:h-10 md:w-10 bg-white text-gray-900 border-gray-300 hover:bg-gray-50"
                   >
-                    <Icon name="User" size={20} />
+                    <Icon name="User" size={16} className="md:w-5 md:h-5" />
                   </Button>
                 </>
               )
             ) : (
-              <Button size="sm" onClick={() => setShowAuthDialog(true)}>
+              <Button size="sm" onClick={() => setShowAuthDialog(true)} className="text-xs md:text-sm px-2 md:px-3 h-7 md:h-9">
                 Войти
               </Button>
             )}
