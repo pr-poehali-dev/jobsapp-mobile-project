@@ -15,6 +15,7 @@ import { toast } from '@/hooks/use-toast';
 import { AuthSystem } from '@/components/AuthSystem';
 import { PaymentDialog } from '@/components/PaymentDialog';
 import { BalanceTopUp } from '@/components/BalanceTopUp';
+import { TransactionHistory } from '@/components/TransactionHistory';
 import { CitySelector } from '@/components/CitySelector';
 import { EmployerBottomNav } from '@/components/EmployerBottomNav';
 import { InstallPrompt } from '@/components/InstallPrompt';
@@ -1162,9 +1163,10 @@ function ProfileDialog({ open, onClose, user, onAddBalance, onSelectTier, onCrea
           <DialogTitle>Личный кабинет</DialogTitle>
         </DialogHeader>
         <Tabs defaultValue="profile" className="w-full">
-          <TabsList className="grid w-full grid-cols-2">
+          <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="profile">Профиль</TabsTrigger>
-            <TabsTrigger value="vacancies">Мои вакансии</TabsTrigger>
+            <TabsTrigger value="vacancies">Вакансии</TabsTrigger>
+            {user.role === 'employer' && <TabsTrigger value="transactions">Транзакции</TabsTrigger>}
           </TabsList>
           
           <TabsContent value="profile" className="space-y-4 mt-4">
@@ -1308,6 +1310,10 @@ function ProfileDialog({ open, onClose, user, onAddBalance, onSelectTier, onCrea
                 )}
               </>
             )}
+          </TabsContent>
+
+          <TabsContent value="transactions" className="space-y-4 mt-4">
+            {user.role === 'employer' && <TransactionHistory userId={user.id} />}
           </TabsContent>
         </Tabs>
       </DialogContent>

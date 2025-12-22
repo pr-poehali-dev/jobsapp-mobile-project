@@ -49,6 +49,9 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             return create_payment(body)
         elif method == 'POST' and 'webhook' in path:
             return handle_webhook(body, event.get('headers', {}))
+        elif method == 'GET' and 'transactions' in path:
+            user_id = path.split('/')[-1]
+            return get_user_transactions(user_id)
         elif method == 'GET' and path:
             return get_payment_status(path.split('/')[-1])
         else:
@@ -416,6 +419,48 @@ def get_payment_status(transaction_id: str) -> Dict[str, Any]:
                     'created_at': transaction['created_at'].isoformat(),
                     'updated_at': transaction['updated_at'].isoformat()
                 }
+            }),
+            'isBase64Encoded': False
+        }
+        
+    finally:
+        cur.close()
+        conn.close()
+
+
+def get_user_transactions(user_id: str) -> Dict[str, Any]:
+    """Получение истории транзакций пользователя"""
+    conn = get_db_connection()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    
+    try:
+        cur.execute("""
+            SELECT id, user_id, amount, type, payment_system, status, description, 
+                   created_at, updated_at
+            FROM transactions
+            WHERE user_id = %s
+            ORDER BY created_at DESC
+            LIMIT 50
+        """, (user_id,))
+        
+        transactions = cur.fetchall()
+        
+        return {
+            'statusCode': 200,
+            'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
+            'body': json.dumps({
+                'success': True,
+                'transactions': [{
+                    'id': str(t['id']),
+                    'user_id': str(t['user_id']),
+                    'amount': float(t['amount']),
+                    'type': t['type'],
+                    'payment_system': t['payment_system'],
+                    'status': t['status'],
+                    'description': t['description'],
+                    'created_at': t['created_at'].isoformat(),
+                    'updated_at': t['updated_at'].isoformat()
+                } for t in transactions]
             }),
             'isBase64Encoded': False
         }
