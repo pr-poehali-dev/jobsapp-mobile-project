@@ -16,6 +16,7 @@ import { AuthSystem } from '@/components/AuthSystem';
 import { PaymentDialog } from '@/components/PaymentDialog';
 import { CitySelector } from '@/components/CitySelector';
 import { EmployerBottomNav } from '@/components/EmployerBottomNav';
+import { InstallPrompt } from '@/components/InstallPrompt';
 import { getAllCities } from '@/data/cities';
 
 interface CitySearchInputProps {
@@ -896,6 +897,9 @@ export default function Index() {
           onDeleteVacancy={handleDeleteEmployerVacancy}
         />
       )}
+
+      {/* Баннер установки приложения для неавторизованных */}
+      {!currentUser && <InstallPrompt />}
     </div>
   );
 }
