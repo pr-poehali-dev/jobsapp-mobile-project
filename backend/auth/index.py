@@ -314,13 +314,13 @@ def register_user(data: Dict[str, Any]) -> Dict[str, Any]:
         
         # Создаем пользователя
         password_hash = hash_password(password)
-        # Новые пользователи начинают с нулевым балансом и ECONOM тарифом
+        # Новые пользователи начинают с нулевым балансом и FREE тарифом
         
         cur.execute("""
             INSERT INTO users (name, email, phone, password_hash, role, balance, tier)
             VALUES (%s, %s, %s, %s, %s, %s, %s)
             RETURNING id
-        """, (name, email if email else None, phone if phone else None, password_hash, role, 0, 'ECONOM'))
+        """, (name, email if email else None, phone if phone else None, password_hash, role, 0, 'FREE'))
         
         user_id = cur.fetchone()['id']
         
@@ -335,13 +335,7 @@ def register_user(data: Dict[str, Any]) -> Dict[str, Any]:
         
         conn.commit()
         
-        # Отправляем код
-        sent = False
-        if verification_type == 'email':
-            sent = send_email(email, code)
-        else:
-            sent = send_sms(phone, code)
-        
+        # Не отправляем SMS/Email, показываем код в уведомлении
         return {
             'statusCode': 201,
             'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
@@ -349,8 +343,8 @@ def register_user(data: Dict[str, Any]) -> Dict[str, Any]:
                 'success': True,
                 'user_id': str(user_id),
                 'verification_required': True,
-                'code_sent': sent,
-                'message': f'Код отправлен на {contact}' if sent else 'Используйте код: ' + code
+                'code': code,
+                'message': f'Ваш код подтверждения: {code}'
             }),
             'isBase64Encoded': False
         }
@@ -581,21 +575,15 @@ def reset_password(data: Dict[str, Any]) -> Dict[str, Any]:
         
         conn.commit()
         
-        # Отправляем код
-        sent = False
-        if reset_type == 'email' and validate_email(contact):
-            sent = send_email(contact, code, 'password_reset')
-        elif reset_type == 'sms' and validate_phone(contact):
-            sent = send_sms(contact, code)
-        
+        # Не отправляем SMS/Email, показываем код в уведомлении
         return {
             'statusCode': 200,
             'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
             'body': json.dumps({
                 'success': True,
                 'user_id': str(user['id']),
-                'code_sent': sent,
-                'message': f'Код отправлен на {contact}' if sent else 'Используйте код: ' + code
+                'code': code,
+                'message': f'Ваш код восстановления: {code}'
             }),
             'isBase64Encoded': False
         }

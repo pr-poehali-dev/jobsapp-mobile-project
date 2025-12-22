@@ -89,11 +89,12 @@ type User = {
   phone: string | null;
   role: UserRole;
   balance: number;
-  tier: 'ECONOM' | 'VIP' | 'PREMIUM';
+  tier: 'FREE' | 'ECONOM' | 'VIP' | 'PREMIUM';
   vacanciesThisMonth: number;
 };
 
 const TIERS = [
+  { name: 'FREE', price: 0, limit: 0, badge: '', moderationTime: '-', description: 'Без размещения вакансий' },
   { name: 'ECONOM', price: 100, limit: 5, badge: '', moderationTime: '48' },
   { name: 'VIP', price: 500, limit: 30, badge: '⭐', moderationTime: '24' },
   { name: 'PREMIUM', price: 2500, limit: 150, badge: '👑', moderationTime: 'моментальная' },

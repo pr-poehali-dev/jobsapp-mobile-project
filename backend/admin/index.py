@@ -285,14 +285,15 @@ def create_vacancy(event: Dict[str, Any], conn, context: Any) -> Dict[str, Any]:
         # Проверка лимита вакансий по тарифу (админы не ограничены)
         if user['role'] != 'admin':
             tier_limits = {
+                'FREE': 0,
                 'ECONOM': 5,
                 'VIP': 30,
                 'PREMIUM': 150
             }
-            limit = tier_limits.get(user['tier'], 5)
+            limit = tier_limits.get(user['tier'], 0)
             
             if user['vacancies_this_month'] >= limit:
-                return error_response(403, f'Лимит вакансий исчерпан ({limit} в месяц для тарифа {user["tier"]})')
+                return error_response(403, f'Лимит вакансий исчерпан ({limit} в месяц для тарифа {user["tier"]}). Приобретите тариф для размещения вакансий.')
         
         # Генерируем UUID для вакансии
         import uuid

@@ -68,10 +68,8 @@ export function AuthSystem({ open, onClose, onSuccess }: AuthSystemProps) {
         setTempUserId(data.user_id);
         setMode('verify');
         toast({
-          title: 'Код отправлен',
-          description: data.code_sent 
-            ? `Код подтверждения отправлен на ${verificationType === 'email' ? formData.email : formData.phone}`
-            : data.message
+          title: 'Код подтверждения',
+          description: data.message || `Ваш код: ${data.code}`
         });
       } else {
         toast({
@@ -187,10 +185,8 @@ export function AuthSystem({ open, onClose, onSuccess }: AuthSystemProps) {
         setTempUserId(data.user_id);
         setMode('confirm-reset');
         toast({
-          title: 'Код отправлен',
-          description: data.code_sent 
-            ? 'Код для сброса пароля отправлен'
-            : data.message
+          title: 'Код восстановления',
+          description: data.message || `Ваш код: ${data.code}`
         });
       } else {
         toast({
