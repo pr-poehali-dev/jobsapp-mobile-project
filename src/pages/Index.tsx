@@ -14,6 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { toast } from '@/hooks/use-toast';
 import { AuthSystem } from '@/components/AuthSystem';
 import { PaymentDialog } from '@/components/PaymentDialog';
+import { BalanceTopUp } from '@/components/BalanceTopUp';
 import { CitySelector } from '@/components/CitySelector';
 import { EmployerBottomNav } from '@/components/EmployerBottomNav';
 import { InstallPrompt } from '@/components/InstallPrompt';
@@ -899,7 +900,22 @@ export default function Index() {
           });
         }}
       />
-      <PaymentDialog open={showBalanceDialog} onClose={() => setShowBalanceDialog(false)} userId={currentUser?.id || ''} />
+      <BalanceTopUp 
+        open={showBalanceDialog} 
+        onClose={() => setShowBalanceDialog(false)} 
+        userId={currentUser?.id || ''}
+        currentBalance={currentUser?.balance || 0}
+        onSuccess={() => {
+          // Обновить баланс пользователя
+          if (currentUser) {
+            // TODO: Получить актуальный баланс из API
+            toast({
+              title: 'Успешно',
+              description: 'Баланс будет обновлен после подтверждения платежа'
+            });
+          }
+        }}
+      />
       <LinkEmailDialog 
         open={showLinkEmailDialog} 
         onClose={() => setShowLinkEmailDialog(false)} 

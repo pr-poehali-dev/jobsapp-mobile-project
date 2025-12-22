@@ -139,24 +139,25 @@ def create_payment(data: Dict[str, Any]) -> Dict[str, Any]:
 def create_pally_payment(transaction_id: str, amount: float, return_url: str) -> str:
     """
     Создает платеж в системе Pally
-    Документация: https://docs.pally.info
+    Документация: https://pally.info/api
     """
     api_key = os.environ.get('PALLY_API_KEY')
     
     if not api_key:
-        # Возвращаем тестовую ссылку если API ключ не настроен
+        print('⚠️ PALLY_API_KEY не настроен')
         return f'https://demo-payment.pally.info?amount={amount}&order={transaction_id}'
     
     try:
         # Формируем запрос к Pally API
         payload = {
-            'amount': amount,
-            'currency': 'RUB',
+            'amount': int(amount * 100),  # В копейках
             'order_id': transaction_id,
-            'description': f'Пополнение баланса Jobs-App',
-            'return_url': return_url,
-            'webhook_url': 'https://yourapp.com/api/payments/webhook'
+            'description': 'Пополнение баланса Jobs-App',
+            'success_url': return_url,
+            'fail_url': return_url.replace('success', 'fail')
         }
+        
+        print(f'📤 Создание платежа Pally: {payload}')
         
         headers = {
             'Authorization': f'Bearer {api_key}',
@@ -164,18 +165,26 @@ def create_pally_payment(transaction_id: str, amount: float, return_url: str) ->
         }
         
         req = urllib.request.Request(
-            'https://api.pally.info/v1/payments',
+            'https://pally.info/api/v1/bill/create',
             data=json.dumps(payload).encode('utf-8'),
             headers=headers,
             method='POST'
         )
         
-        with urllib.request.urlopen(req, timeout=10) as response:
+        with urllib.request.urlopen(req, timeout=30) as response:
             result = json.loads(response.read().decode('utf-8'))
-            return result.get('payment_url', '#')
+            print(f'✅ Ответ Pally: {result}')
+            
+            if result.get('success') and result.get('data'):
+                return result['data'].get('url', '#')
+            else:
+                print(f'❌ Ошибка Pally: {result}')
+                return f'https://demo-payment.pally.info?amount={amount}&order={transaction_id}'
             
     except Exception as e:
-        print(f'Pally payment creation failed: {e}')
+        print(f'❌ Ошибка создания платежа Pally: {e}')
+        import traceback
+        traceback.print_exc()
         return f'https://demo-payment.pally.info?amount={amount}&order={transaction_id}'
 
 
@@ -294,17 +303,17 @@ def handle_yoomoney_webhook(data: Dict[str, Any]) -> Dict[str, Any]:
 
 def handle_pally_webhook(data: Dict[str, Any], headers: Dict[str, str]) -> Dict[str, Any]:
     """Обработка webhook от Pally"""
+    print(f'🔔 Webhook от Pally: {data}')
+    
     transaction_id = data.get('order_id')
-    amount = float(data.get('amount', 0))
+    amount = float(data.get('amount', 0)) / 100  # Из копеек в рубли
     status = data.get('status')
     payment_id = data.get('payment_id')
     
-    # Проверка подписи (если настроена)
-    # signature = headers.get('X-Pally-Signature')
-    # if not verify_pally_signature(data, signature):
-    #     return {'statusCode': 403, 'body': json.dumps({'error': 'Invalid signature'})}
+    print(f'📊 Данные: transaction_id={transaction_id}, amount={amount}, status={status}')
     
     if status != 'success':
+        print(f'⚠️ Статус не success: {status}')
         return {
             'statusCode': 200,
             'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
@@ -319,13 +328,25 @@ def handle_pally_webhook(data: Dict[str, Any], headers: Dict[str, str]) -> Dict[
         cur.execute('SELECT * FROM transactions WHERE id = %s', (transaction_id,))
         transaction = cur.fetchone()
         
-        if not transaction or transaction['status'] == 'completed':
+        if not transaction:
+            print(f'❌ Транзакция не найдена: {transaction_id}')
+            return {
+                'statusCode': 404,
+                'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
+                'body': json.dumps({'error': 'Transaction not found'}),
+                'isBase64Encoded': False
+            }
+        
+        if transaction['status'] == 'completed':
+            print(f'⚠️ Транзакция уже обработана: {transaction_id}')
             return {
                 'statusCode': 200,
                 'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
                 'body': json.dumps({'success': True}),
                 'isBase64Encoded': False
             }
+        
+        print(f'💰 Пополнение баланса: user_id={transaction["user_id"]}, amount={transaction["amount"]}')
         
         cur.execute("""
             UPDATE transactions
@@ -337,9 +358,10 @@ def handle_pally_webhook(data: Dict[str, Any], headers: Dict[str, str]) -> Dict[
             UPDATE users
             SET balance = balance + %s
             WHERE id = %s
-        """, (amount, transaction['user_id']))
+        """, (transaction['amount'], transaction['user_id']))
         
         conn.commit()
+        print(f'✅ Баланс пополнен успешно: {transaction["user_id"]}')
         
         return {
             'statusCode': 200,
@@ -350,6 +372,7 @@ def handle_pally_webhook(data: Dict[str, Any], headers: Dict[str, str]) -> Dict[
         
     except Exception as e:
         conn.rollback()
+        print(f'❌ Ошибка обработки Pally webhook: {e}')
         raise e
     finally:
         cur.close()
