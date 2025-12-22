@@ -108,6 +108,12 @@
       height: 100%;
     }
   }
+
+  @media (display-mode: standalone) {
+    body {
+      padding-top: env(safe-area-inset-top);
+    }
+  }
 }
 
 @layer utilities {
