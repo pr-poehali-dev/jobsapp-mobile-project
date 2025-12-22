@@ -668,7 +668,6 @@ export default function Index() {
                     translateY = 100 + (swipeOffset < 0 ? swipeOffset / window.innerHeight * 100 : 0);
                   }
                   
-                  {
                   const baseClassName = 'w-full max-w-md swipe-card touch-none flex-shrink-0 absolute left-0 right-0 mx-auto px-4';
                   const tierClassName = vacancy.employerTier === 'PREMIUM' 
                     ? 'border-yellow-500 bg-gradient-to-br from-yellow-50 to-background'
