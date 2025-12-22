@@ -1568,17 +1568,22 @@ function VacancyDialog({ open, onClose, onCreate }: { open: boolean; onClose: ()
               onBlur={(e) => {
                 const value = e.target.value.replace(/₽/g, '').trim();
                 if (value) {
-                  // Форматируем только числа (добавляем пробелы в разрядах)
-                  const formatted = value.replace(/\b(\d+)\b/g, (match) => {
-                    // Убираем существующие пробелы в числе
-                    const num = match.replace(/\s/g, '');
+                  // Форматируем числа с пробелами в разрядах
+                  const formatted = value.replace(/(\d)[\s]*(\d)/g, (match, d1, d2) => {
+                    // Склеиваем все цифры подряд без пробелов
+                    return d1 + d2;
+                  }).replace(/\b(\d+)\b/g, (match) => {
                     // Если число >= 1000, форматируем с пробелами
-                    if (num.length >= 4) {
-                      return num.replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+                    if (match.length >= 4) {
+                      return match.replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
                     }
-                    return num;
+                    return match;
                   });
-                  setVacancy({ ...vacancy, salary: formatted + ' ₽' });
+                  
+                  // Нормализуем дефисы и тире с пробелами
+                  const normalized = formatted.replace(/\s*[-–—]\s*/g, ' - ');
+                  
+                  setVacancy({ ...vacancy, salary: normalized + ' ₽' });
                 }
               }}
             />
