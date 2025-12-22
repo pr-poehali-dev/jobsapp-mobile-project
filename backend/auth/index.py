@@ -519,6 +519,8 @@ def reset_password(data: Dict[str, Any]) -> Dict[str, Any]:
     contact = data.get('contact', '').strip().lower()
     reset_type = data.get('type', 'email')
     
+    print(f'🔐 Запрос сброса пароля: contact={contact}, type={reset_type}')
+    
     if not contact:
         return {
             'statusCode': 400,
@@ -538,6 +540,7 @@ def reset_password(data: Dict[str, Any]) -> Dict[str, Any]:
         user = cur.fetchone()
         
         if not user:
+            print(f'⚠️ Пользователь не найден: {contact}')
             return {
                 'statusCode': 200,
                 'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
@@ -548,6 +551,8 @@ def reset_password(data: Dict[str, Any]) -> Dict[str, Any]:
                 'isBase64Encoded': False
             }
         
+        print(f'✅ Пользователь найден: user_id={user["id"]}')
+        
         code = generate_code()
         expires_at = datetime.now() + timedelta(minutes=10)
         
@@ -557,13 +562,18 @@ def reset_password(data: Dict[str, Any]) -> Dict[str, Any]:
         """, (user['id'], code, 'password_reset', contact, expires_at))
         
         conn.commit()
+        print(f'✅ Код верификации сохранен: {code}')
         
         if reset_type == 'email' and validate_email(contact):
+            print(f'📧 Отправка email на {contact}')
             success, message = send_email(contact, code, 'password_reset')
         elif reset_type == 'sms' and validate_phone(contact):
+            print(f'📱 Отправка SMS на {contact}')
             success, message = send_sms(contact, code)
         else:
             success, message = False, 'Некорректный формат контакта'
+        
+        print(f'{"✅" if success else "❌"} Результат отправки: {message}')
         
         return {
             'statusCode': 200,
