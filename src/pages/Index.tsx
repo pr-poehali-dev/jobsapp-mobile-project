@@ -72,6 +72,11 @@ type Vacancy = {
   id: string;
   title: string;
   description: string;
+  requirements?: string;
+  responsibilities?: string;
+  experience?: string;
+  noExperience?: boolean;
+  schedule?: string;
   salary: string;
   city: string;
   phone: string;
@@ -185,6 +190,10 @@ export default function Index() {
           id: v.id,
           title: v.title,
           description: v.description,
+          requirements: v.requirements,
+          responsibilities: v.responsibilities,
+          experience: v.experience,
+          schedule: v.schedule,
           salary: v.salary,
           city: v.city,
           phone: v.phone,
@@ -244,6 +253,10 @@ export default function Index() {
           id: v.id,
           title: v.title,
           description: v.description,
+          requirements: v.requirements,
+          responsibilities: v.responsibilities,
+          experience: v.experience,
+          schedule: v.schedule,
           salary: v.salary,
           city: v.city,
           phone: v.phone,
@@ -277,7 +290,22 @@ export default function Index() {
   const filteredVacancies = useMemo(() => {
     return vacancies.filter((v) => {
       if (v.status !== 'published') return false;
-      if (searchQuery && !v.title.toLowerCase().includes(searchQuery.toLowerCase())) return false;
+      
+      // Поиск по названию, описанию, требованиям и обязанностям
+      if (searchQuery) {
+        const query = searchQuery.toLowerCase();
+        const searchableText = [
+          v.title,
+          v.description,
+          v.requirements,
+          v.responsibilities,
+          v.experience,
+          v.schedule
+        ].filter(Boolean).join(' ').toLowerCase();
+        
+        if (!searchableText.includes(query)) return false;
+      }
+      
       if (selectedTags.length > 0 && !selectedTags.some((tag) => v.tags.includes(tag))) return false;
       if (selectedCity && v.city !== selectedCity) return false;
       return true;
@@ -415,6 +443,10 @@ export default function Index() {
         user_id: currentUser.id,
         title: vacancy.title || '',
         description: vacancy.description || '',
+        requirements: vacancy.requirements || '',
+        responsibilities: vacancy.responsibilities || '',
+        experience: vacancy.noExperience ? 'Без опыта' : (vacancy.experience || ''),
+        schedule: vacancy.schedule || '',
         salary: vacancy.salary || '',
         city: vacancy.city || '',
         phone: vacancy.phone || currentUser.phone || '+7',
@@ -759,8 +791,32 @@ export default function Index() {
                             </Badge>
                           ))}
                         </div>
-                        <p className="text-sm text-muted-foreground">{vacancy.description}</p>
+                        {vacancy.description && <p className="text-sm text-muted-foreground">{vacancy.description}</p>}
+                        {vacancy.requirements && (
+                          <div>
+                            <p className="text-xs font-semibold text-foreground mb-1">Требования:</p>
+                            <p className="text-sm text-muted-foreground">{vacancy.requirements}</p>
+                          </div>
+                        )}
+                        {vacancy.responsibilities && (
+                          <div>
+                            <p className="text-xs font-semibold text-foreground mb-1">Обязанности:</p>
+                            <p className="text-sm text-muted-foreground">{vacancy.responsibilities}</p>
+                          </div>
+                        )}
                         <div className="pt-2 border-t space-y-2">
+                          {vacancy.schedule && (
+                            <div className="flex items-center justify-between">
+                              <span className="text-sm text-muted-foreground">График:</span>
+                              <span className="text-sm font-medium">{vacancy.schedule}</span>
+                            </div>
+                          )}
+                          {vacancy.experience && (
+                            <div className="flex items-center justify-between">
+                              <span className="text-sm text-muted-foreground">Опыт работы:</span>
+                              <span className="text-sm font-medium">{vacancy.experience}</span>
+                            </div>
+                          )}
                           <div className="flex items-center justify-between">
                             <span className="text-sm text-muted-foreground">Зарплата:</span>
                             <span className="font-semibold text-primary">{vacancy.salary}</span>
@@ -944,8 +1000,32 @@ function VacancyCard({ vacancy, currentUser, onAuthClick }: { vacancy: Vacancy; 
             </Badge>
           ))}
         </div>
-        <p className="text-sm text-muted-foreground line-clamp-3">{vacancy.description}</p>
+        {vacancy.description && <p className="text-sm text-muted-foreground line-clamp-2">{vacancy.description}</p>}
+        {vacancy.requirements && (
+          <div>
+            <p className="text-xs font-semibold text-foreground mb-1">Требования:</p>
+            <p className="text-sm text-muted-foreground line-clamp-2">{vacancy.requirements}</p>
+          </div>
+        )}
+        {vacancy.responsibilities && (
+          <div>
+            <p className="text-xs font-semibold text-foreground mb-1">Обязанности:</p>
+            <p className="text-sm text-muted-foreground line-clamp-2">{vacancy.responsibilities}</p>
+          </div>
+        )}
         <div className="pt-2 border-t space-y-2">
+          {vacancy.schedule && (
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-muted-foreground">График:</span>
+              <span className="text-sm font-medium">{vacancy.schedule}</span>
+            </div>
+          )}
+          {vacancy.experience && (
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-muted-foreground">Опыт работы:</span>
+              <span className="text-sm font-medium">{vacancy.experience}</span>
+            </div>
+          )}
           <div className="flex items-center justify-between">
             <span className="text-sm text-muted-foreground">Зарплата:</span>
             <span className="font-semibold text-primary">{vacancy.salary}</span>
@@ -1000,6 +1080,10 @@ function ProfileDialog({ open, onClose, user, onAddBalance, onSelectTier, onCrea
           id: v.id,
           title: v.title,
           description: v.description,
+          requirements: v.requirements,
+          responsibilities: v.responsibilities,
+          experience: v.experience,
+          schedule: v.schedule,
           salary: v.salary,
           city: v.city,
           phone: v.phone,
@@ -1366,6 +1450,11 @@ function VacancyDialog({ open, onClose, onCreate }: { open: boolean; onClose: ()
   const [vacancy, setVacancy] = useState<Partial<Vacancy>>({
     title: '',
     description: '',
+    requirements: '',
+    responsibilities: '',
+    experience: '',
+    noExperience: false,
+    schedule: '',
     salary: '',
     city: '',
     phone: '',
@@ -1378,6 +1467,19 @@ function VacancyDialog({ open, onClose, onCreate }: { open: boolean; onClose: ()
       setVacancy({ ...vacancy, tags: tags.filter((t) => t !== tag) });
     } else {
       setVacancy({ ...vacancy, tags: [...tags, tag] });
+    }
+  };
+
+  const toggleNoExperience = (checked: boolean) => {
+    const tags = vacancy.tags || [];
+    if (checked) {
+      if (!tags.includes('Без опыта')) {
+        setVacancy({ ...vacancy, noExperience: true, experience: '', tags: [...tags, 'Без опыта'] });
+      } else {
+        setVacancy({ ...vacancy, noExperience: true, experience: '' });
+      }
+    } else {
+      setVacancy({ ...vacancy, noExperience: false, tags: tags.filter((t) => t !== 'Без опыта') });
     }
   };
 
@@ -1396,11 +1498,63 @@ function VacancyDialog({ open, onClose, onCreate }: { open: boolean; onClose: ()
           <div>
             <Label>Описание</Label>
             <Textarea
-              placeholder="Требования, условия работы..."
+              placeholder="Общее описание вакансии..."
               value={vacancy.description}
               onChange={(e) => setVacancy({ ...vacancy, description: e.target.value })}
-              rows={4}
+              rows={3}
             />
+          </div>
+          <div>
+            <Label>Требования</Label>
+            <Textarea
+              placeholder="Образование, навыки, знания..."
+              value={vacancy.requirements}
+              onChange={(e) => setVacancy({ ...vacancy, requirements: e.target.value })}
+              rows={3}
+            />
+          </div>
+          <div>
+            <Label>Обязанности</Label>
+            <Textarea
+              placeholder="Что предстоит делать на этой позиции..."
+              value={vacancy.responsibilities}
+              onChange={(e) => setVacancy({ ...vacancy, responsibilities: e.target.value })}
+              rows={3}
+            />
+          </div>
+          <div>
+            <div className="flex items-center gap-2 mb-2">
+              <Checkbox 
+                id="noExperience" 
+                checked={vacancy.noExperience}
+                onCheckedChange={toggleNoExperience}
+              />
+              <Label htmlFor="noExperience" className="cursor-pointer">Без опыта</Label>
+            </div>
+            {!vacancy.noExperience && (
+              <div>
+                <Label>Стаж работы</Label>
+                <Input 
+                  placeholder="Например: от 1 года" 
+                  value={vacancy.experience} 
+                  onChange={(e) => setVacancy({ ...vacancy, experience: e.target.value })} 
+                />
+              </div>
+            )}
+          </div>
+          <div>
+            <Label>График работы</Label>
+            <Select value={vacancy.schedule} onValueChange={(value) => setVacancy({ ...vacancy, schedule: value })}>
+              <SelectTrigger>
+                <SelectValue placeholder="Выберите график работы" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="Полная занятость">Полная занятость</SelectItem>
+                <SelectItem value="Частичная занятость">Частичная занятость</SelectItem>
+                <SelectItem value="Временная работа">Временная работа</SelectItem>
+                <SelectItem value="Стажировка">Стажировка</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
           <div>
             <Label>Зарплата</Label>
@@ -1469,6 +1623,10 @@ function AdminDialog({
           id: v.id,
           title: v.title,
           description: v.description,
+          requirements: v.requirements,
+          responsibilities: v.responsibilities,
+          experience: v.experience,
+          schedule: v.schedule,
           salary: v.salary,
           city: v.city,
           phone: v.phone,

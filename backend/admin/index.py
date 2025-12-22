@@ -306,15 +306,20 @@ def create_vacancy(event: Dict[str, Any], conn, context: Any) -> Dict[str, Any]:
         
         cur.execute("""
             INSERT INTO vacancies (
-                id, user_id, title, description, salary, city, phone,
+                id, user_id, title, description, requirements, responsibilities, 
+                experience, schedule, salary, city, phone,
                 employer_name, employer_tier, tags, status, source
-            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             RETURNING *
         """, (
             vacancy_id,
             body['user_id'],
             body['title'],
             body['description'],
+            body.get('requirements', ''),
+            body.get('responsibilities', ''),
+            body.get('experience', ''),
+            body.get('schedule', ''),
             body['salary'],
             body['city'],
             body['phone'],
