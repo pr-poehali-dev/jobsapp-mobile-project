@@ -751,7 +751,7 @@ export default function Index() {
                           )}
                         </div>
                       </CardHeader>
-                      <CardContent className="space-y-4 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 260px)' }}>
+                      <CardContent className="space-y-4 overflow-y-auto pb-8" style={{ maxHeight: 'calc(100vh - 220px)' }}>
                         <div className="flex flex-wrap gap-2">
                           {vacancy.tags.map((tag) => (
                             <Badge key={tag} variant="outline">
