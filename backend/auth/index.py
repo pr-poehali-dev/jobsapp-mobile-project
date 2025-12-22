@@ -83,8 +83,19 @@ def send_sms(phone: str, code: str) -> bool:
         try:
             result_json = json.loads(result)
             if 'error' in result_json or 'error_code' in result_json:
-                print(f'SMSC error: {result_json}')
+                error_code = result_json.get('error_code', 'unknown')
+                error_msg = result_json.get('error', 'unknown error')
+                print(f'❌ SMSC error {error_code}: {error_msg}')
+                print(f'   Possible reasons:')
+                if error_code == 6:
+                    print(f'   - Недостаточно средств на балансе SMSC')
+                    print(f'   - Сообщение заблокировано фильтрами SMSC')
+                    print(f'   - Проверьте баланс на smsc.ru')
+                elif error_code == 1:
+                    print(f'   - Неверный логин или пароль SMSC')
+                print(f'   Full response: {result_json}')
                 return False
+            print(f'✅ SMS sent successfully: {result_json}')
             return True
         except:
             # Fallback для старого формата
@@ -337,10 +348,19 @@ def register_user(data: Dict[str, Any]) -> Dict[str, Any]:
         
         # Отправляем код
         sent = False
+        error_message = None
         if verification_type == 'email':
             sent = send_email(email, code)
+            if not sent:
+                error_message = 'Не удалось отправить email. Проверьте адрес почты.'
         else:
             sent = send_sms(phone, code)
+            if not sent:
+                error_message = 'SMS-сервис временно недоступен. Попробуйте регистрацию через email или обратитесь в поддержку.'
+        
+        # Логируем код для отладки (только если не отправилось)
+        if not sent:
+            print(f'⚠️ Verification code for {contact}: {code} (valid for 10 minutes)')
         
         return {
             'statusCode': 201,
@@ -350,7 +370,8 @@ def register_user(data: Dict[str, Any]) -> Dict[str, Any]:
                 'user_id': str(user_id),
                 'verification_required': True,
                 'code_sent': sent,
-                'message': f'Код отправлен на {contact}' if sent else f'Не удалось отправить код. Проверьте {contact}'
+                'message': f'Код отправлен на {contact}' if sent else error_message,
+                'hint': 'Используйте email для регистрации' if not sent and verification_type == 'sms' else None
             }),
             'isBase64Encoded': False
         }
