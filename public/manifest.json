@@ -1,0 +1,24 @@
+{
+  "name": "Jobs-App - Поиск работы",
+  "short_name": "Jobs-App",
+  "description": "Удобный сервис для поиска работы и размещения вакансий",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#667eea",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "https://cdn.poehali.dev/projects/a3641a3b-de56-4ee9-801b-686b5baf8d0b/files/a6adaacf-357a-4290-9a35-5efe766fdf97.jpg",
+      "sizes": "192x192",
+      "type": "image/jpeg",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "https://cdn.poehali.dev/projects/a3641a3b-de56-4ee9-801b-686b5baf8d0b/files/a6adaacf-357a-4290-9a35-5efe766fdf97.jpg",
+      "sizes": "512x512",
+      "type": "image/jpeg",
+      "purpose": "any maskable"
+    }
+  ]
+}
