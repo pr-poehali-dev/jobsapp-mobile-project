@@ -1463,46 +1463,55 @@ function TierDialog({
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="space-y-2">
-                    <div className="flex items-center gap-2 text-sm">
-                      <Icon name="Check" size={16} className="text-primary" />
-                      <span>До {tier.limit} объявлени{tier.limit === 1 ? 'я' : 'й'} в месяц</span>
-                    </div>
-                    <div className="flex items-center gap-2 text-sm">
-                      <Icon name="Check" size={16} className="text-primary" />
-                      <span>Модерация в течение {tier.moderationTime} часов*</span>
-                    </div>
-                    {tier.name === 'ECONOM' && (
+                    {tier.name === 'FREE' ? (
                       <div className="flex items-center gap-2 text-sm">
                         <Icon name="Check" size={16} className="text-primary" />
-                        <span>Ваши вакансии всегда выше чем у Free тарифа</span>
+                        <span>Возможность видеть контакты в вакансиях</span>
                       </div>
-                    )}
-                    {tier.name === 'VIP' && (
+                    ) : (
                       <>
                         <div className="flex items-center gap-2 text-sm">
                           <Icon name="Check" size={16} className="text-primary" />
-                          <span>Ваши вакансии всегда выше чем у тарифа "Эконом"</span>
+                          <span>До {tier.limit} объявлени{tier.limit === 1 ? 'я' : 'й'} в месяц</span>
                         </div>
                         <div className="flex items-center gap-2 text-sm">
                           <Icon name="Check" size={16} className="text-primary" />
-                          <span>Значок VIP в объявлениях</span>
+                          <span>Модерация в течение {tier.moderationTime} часов*</span>
                         </div>
-                      </>
-                    )}
-                    {tier.name === 'PREMIUM' && (
-                      <>
-                        <div className="flex items-center gap-2 text-sm">
-                          <Icon name="Check" size={16} className="text-primary" />
-                          <span>Моментальная модерация</span>
-                        </div>
-                        <div className="flex items-center gap-2 text-sm">
-                          <Icon name="Check" size={16} className="text-primary" />
-                          <span>Ваши вакансии после размещения всегда будут вверху поиска</span>
-                        </div>
-                        <div className="flex items-center gap-2 text-sm">
-                          <Icon name="Check" size={16} className="text-primary" />
-                          <span>Значок PREMIUM в объявлениях</span>
-                        </div>
+                        {tier.name === 'ECONOM' && (
+                          <div className="flex items-center gap-2 text-sm">
+                            <Icon name="Check" size={16} className="text-primary" />
+                            <span>Ваши вакансии всегда выше чем у Free тарифа</span>
+                          </div>
+                        )}
+                        {tier.name === 'VIP' && (
+                          <>
+                            <div className="flex items-center gap-2 text-sm">
+                              <Icon name="Check" size={16} className="text-primary" />
+                              <span>Ваши вакансии всегда выше чем у тарифа "Эконом"</span>
+                            </div>
+                            <div className="flex items-center gap-2 text-sm">
+                              <Icon name="Check" size={16} className="text-primary" />
+                              <span>Значок VIP в объявлениях</span>
+                            </div>
+                          </>
+                        )}
+                        {tier.name === 'PREMIUM' && (
+                          <>
+                            <div className="flex items-center gap-2 text-sm">
+                              <Icon name="Check" size={16} className="text-primary" />
+                              <span>Моментальная модерация</span>
+                            </div>
+                            <div className="flex items-center gap-2 text-sm">
+                              <Icon name="Check" size={16} className="text-primary" />
+                              <span>Ваши вакансии после размещения всегда будут вверху поиска</span>
+                            </div>
+                            <div className="flex items-center gap-2 text-sm">
+                              <Icon name="Check" size={16} className="text-primary" />
+                              <span>Значок PREMIUM в объявлениях</span>
+                            </div>
+                          </>
+                        )}
                       </>
                     )}
                   </div>
