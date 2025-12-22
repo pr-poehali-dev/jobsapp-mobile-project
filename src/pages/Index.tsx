@@ -754,9 +754,9 @@ export default function Index() {
                           <Icon name="ChevronDown" size={16} className="inline" />
                         </div>
                       </CardContent>
-                      </Card>
-                    );
-                  })}
+                    </Card>
+                  );
+                })}
               </div>
             </>
           )}
