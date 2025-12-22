@@ -90,6 +90,48 @@ export function AuthSystem({ open, onClose, onSuccess }: AuthSystemProps) {
     }
   };
 
+  const handleResendVerificationCode = async () => {
+    setLoading(true);
+    try {
+      const response = await fetch(`${AUTH_API_URL}?path=register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: formData.name,
+          email: verificationType === 'email' ? formData.email : undefined,
+          phone: verificationType === 'sms' ? formData.phone : undefined,
+          password: formData.password,
+          role: role,
+          verification_type: verificationType
+        })
+      });
+
+      const data = await response.json();
+
+      if (response.ok && data.success) {
+        toast({
+          title: data.code_sent ? 'Код отправлен повторно' : 'Проблема отправки',
+          description: data.message,
+          variant: data.code_sent ? 'default' : 'destructive'
+        });
+      } else {
+        toast({
+          title: 'Ошибка',
+          description: data.error || 'Не удалось отправить код',
+          variant: 'destructive'
+        });
+      }
+    } catch (error) {
+      toast({
+        title: 'Ошибка',
+        description: 'Не удалось подключиться к серверу',
+        variant: 'destructive'
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleVerify = async () => {
     setLoading(true);
     try {
@@ -187,6 +229,44 @@ export function AuthSystem({ open, onClose, onSuccess }: AuthSystemProps) {
         setMode('confirm-reset');
         toast({
           title: data.code_sent ? 'Код отправлен' : 'Проблема отправки',
+          description: data.message,
+          variant: data.code_sent ? 'default' : 'destructive'
+        });
+      } else {
+        toast({
+          title: 'Ошибка',
+          description: data.error || 'Не удалось отправить код',
+          variant: 'destructive'
+        });
+      }
+    } catch (error) {
+      toast({
+        title: 'Ошибка',
+        description: 'Не удалось подключиться к серверу',
+        variant: 'destructive'
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleResendResetCode = async () => {
+    setLoading(true);
+    try {
+      const response = await fetch(`${AUTH_API_URL}?path=reset-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contact: formData.email || formData.phone,
+          type: verificationType
+        })
+      });
+
+      const data = await response.json();
+
+      if (response.ok && data.success) {
+        toast({
+          title: data.code_sent ? 'Код отправлен повторно' : 'Проблема отправки',
           description: data.message,
           variant: data.code_sent ? 'default' : 'destructive'
         });
@@ -318,6 +398,7 @@ export function AuthSystem({ open, onClose, onSuccess }: AuthSystemProps) {
             verificationType={verificationType}
             onVerify={handleVerify}
             onSwitchToRegister={() => { setMode('register'); resetForm(); }}
+            onResendCode={handleResendVerificationCode}
             loading={loading}
           />
         )}
@@ -339,6 +420,7 @@ export function AuthSystem({ open, onClose, onSuccess }: AuthSystemProps) {
             formData={formData}
             setFormData={setFormData}
             onConfirmReset={handleConfirmReset}
+            onResendCode={handleResendResetCode}
             loading={loading}
           />
         )}

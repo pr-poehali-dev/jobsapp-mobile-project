@@ -3,6 +3,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { PhoneInput } from '@/components/ui/phone-input';
+import { useState, useEffect } from 'react';
 
 interface ResetPasswordFormProps {
   formData: {
@@ -82,6 +83,7 @@ interface ConfirmResetFormProps {
   };
   setFormData: (data: any) => void;
   onConfirmReset: () => void;
+  onResendCode: () => void;
   loading: boolean;
 }
 
@@ -89,8 +91,27 @@ export function ConfirmResetForm({
   formData,
   setFormData,
   onConfirmReset,
+  onResendCode,
   loading
 }: ConfirmResetFormProps) {
+  const [resendTimer, setResendTimer] = useState(60);
+  const [canResend, setCanResend] = useState(false);
+
+  useEffect(() => {
+    if (resendTimer > 0) {
+      const timer = setTimeout(() => setResendTimer(resendTimer - 1), 1000);
+      return () => clearTimeout(timer);
+    } else {
+      setCanResend(true);
+    }
+  }, [resendTimer]);
+
+  const handleResendCode = () => {
+    onResendCode();
+    setResendTimer(60);
+    setCanResend(false);
+  };
+
   return (
     <div className="space-y-4">
       <div>
@@ -113,6 +134,14 @@ export function ConfirmResetForm({
       </div>
       <Button className="w-full" onClick={onConfirmReset} disabled={loading}>
         {loading ? 'Сохранение...' : 'Изменить пароль'}
+      </Button>
+      <Button 
+        variant="outline" 
+        className="w-full" 
+        onClick={handleResendCode} 
+        disabled={!canResend || loading}
+      >
+        {canResend ? 'Отправить код снова' : `Повтор через ${resendTimer}с`}
       </Button>
     </div>
   );
