@@ -47,6 +47,15 @@ export const PhoneInput = forwardRef<HTMLInputElement, PhoneInputProps>(
       onChange(formatted);
     };
     
+    const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+      // При Backspace или Delete, если осталось только +7, очищаем
+      if ((e.key === 'Backspace' || e.key === 'Delete') && value === '+7') {
+        onChange('+7');
+        e.preventDefault();
+      }
+      props.onKeyDown?.(e);
+    };
+    
     const handleFocus = (e: React.FocusEvent<HTMLInputElement>) => {
       // При фокусе, если поле пустое, ставим +7
       if (!value || value === '') {
@@ -62,6 +71,7 @@ export const PhoneInput = forwardRef<HTMLInputElement, PhoneInputProps>(
         type="tel"
         value={value}
         onChange={handleChange}
+        onKeyDown={handleKeyDown}
         onFocus={handleFocus}
         placeholder="+7 (999) 123-45-67"
       />
