@@ -504,8 +504,8 @@ export default function Index() {
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
-      <header className="sticky top-0 z-50 bg-accent text-accent-foreground shadow-md">
-        <div className="container mx-auto px-2 md:px-4 py-1 md:py-3 flex items-center justify-between">
+      <header className="sticky top-0 z-50 bg-accent text-accent-foreground shadow-md h-12 md:h-auto">
+        <div className="container mx-auto px-2 md:px-4 h-12 md:h-auto md:py-3 flex items-center justify-between">
           <div className="flex items-center gap-1 md:gap-2">
             <Icon name="Briefcase" size={16} className="md:w-6 md:h-6" />
             <h1 className="text-sm md:text-xl font-bold">Jobs-App</h1>
