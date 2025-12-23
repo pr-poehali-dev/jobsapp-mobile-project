@@ -23,6 +23,20 @@ def get_db_connection():
     return psycopg2.connect(os.environ['DATABASE_URL'])
 
 
+def sql_escape(value: Any) -> str:
+    """Экранирует значение для использования в SQL"""
+    if value is None:
+        return 'NULL'
+    if isinstance(value, bool):
+        return 'TRUE' if value else 'FALSE'
+    if isinstance(value, (int, float)):
+        return str(value)
+    if isinstance(value, datetime):
+        return f"'{value.isoformat()}'"
+    # Для строк экранируем одинарные кавычки
+    return f"'{str(value).replace(chr(39), chr(39) + chr(39))}'"
+
+
 def hash_password(password: str) -> str:
     """Хеширует пароль с использованием bcrypt"""
     salt = bcrypt.gensalt()
@@ -297,7 +311,7 @@ def register_user(data: Dict[str, Any]) -> Dict[str, Any]:
     
     try:
         if email:
-            cur.execute('SELECT id FROM users WHERE email = %s', (email,))
+            cur.execute(f"SELECT id FROM users WHERE email = {sql_escape(email)}")
             if cur.fetchone():
                 return {
                     'statusCode': 400,
@@ -307,7 +321,7 @@ def register_user(data: Dict[str, Any]) -> Dict[str, Any]:
                 }
         
         if phone:
-            cur.execute('SELECT id FROM users WHERE phone = %s', (phone,))
+            cur.execute(f"SELECT id FROM users WHERE phone = {sql_escape(phone)}")
             if cur.fetchone():
                 return {
                     'statusCode': 400,
@@ -318,21 +332,26 @@ def register_user(data: Dict[str, Any]) -> Dict[str, Any]:
         
         password_hash = hash_password(password)
         
-        cur.execute("""
+        email_val = sql_escape(email) if email else 'NULL'
+        phone_val = sql_escape(phone) if phone else 'NULL'
+        
+        cur.execute(f"""
             INSERT INTO users (name, email, phone, password_hash, role, balance, tier)
-            VALUES (%s, %s, %s, %s, %s, %s, %s)
+            VALUES ({sql_escape(name)}, {email_val}, {phone_val}, {sql_escape(password_hash)}, 
+                    {sql_escape(role)}, 0, 'FREE')
             RETURNING id
-        """, (name, email if email else None, phone if phone else None, password_hash, role, 0, 'FREE'))
+        """)
         
         user_id = cur.fetchone()['id']
         
         code = generate_code()
         expires_at = datetime.now() + timedelta(minutes=10)
         
-        cur.execute("""
+        cur.execute(f"""
             INSERT INTO verification_codes (user_id, code, type, contact, expires_at)
-            VALUES (%s, %s, %s, %s, %s)
-        """, (user_id, code, verification_type, contact, expires_at))
+            VALUES ({user_id}, {sql_escape(code)}, {sql_escape(verification_type)}, 
+                    {sql_escape(contact)}, {sql_escape(expires_at)})
+        """)
         
         conn.commit()
         
@@ -379,12 +398,13 @@ def verify_code(data: Dict[str, Any]) -> Dict[str, Any]:
     cur = conn.cursor(cursor_factory=RealDictCursor)
     
     try:
-        cur.execute("""
+        cur.execute(f"""
             SELECT * FROM verification_codes
-            WHERE user_id = %s AND code = %s AND used = FALSE AND expires_at > NOW()
+            WHERE user_id = {user_id} AND code = {sql_escape(code)} 
+            AND used = FALSE AND expires_at > NOW()
             ORDER BY created_at DESC
             LIMIT 1
-        """, (user_id, code))
+        """)
         
         verification = cur.fetchone()
         
@@ -396,18 +416,18 @@ def verify_code(data: Dict[str, Any]) -> Dict[str, Any]:
                 'isBase64Encoded': False
             }
         
-        cur.execute('UPDATE verification_codes SET used = TRUE WHERE id = %s', (verification['id'],))
+        cur.execute(f"UPDATE verification_codes SET used = TRUE WHERE id = {verification['id']}")
         
         if verification['type'] == 'email':
-            cur.execute('UPDATE users SET email_verified = TRUE WHERE id = %s', (user_id,))
+            cur.execute(f"UPDATE users SET email_verified = TRUE WHERE id = {user_id}")
         elif verification['type'] == 'sms':
-            cur.execute('UPDATE users SET phone_verified = TRUE WHERE id = %s', (user_id,))
+            cur.execute(f"UPDATE users SET phone_verified = TRUE WHERE id = {user_id}")
         
-        cur.execute("""
+        cur.execute(f"""
             SELECT id, name, email, phone, role, balance, tier, vacancies_this_month,
                    email_verified, phone_verified
-            FROM users WHERE id = %s
-        """, (user_id,))
+            FROM users WHERE id = {user_id}
+        """)
         
         user = cur.fetchone()
         conn.commit()
@@ -468,12 +488,12 @@ def login_user(data: Dict[str, Any]) -> Dict[str, Any]:
     cur = conn.cursor(cursor_factory=RealDictCursor)
     
     try:
-        cur.execute("""
+        cur.execute(f"""
             SELECT id, name, email, phone, password_hash, role, balance, tier,
                    vacancies_this_month, email_verified, phone_verified
             FROM users
-            WHERE email = %s OR phone = %s
-        """, (login_normalized, login_normalized))
+            WHERE email = {sql_escape(login_normalized)} OR phone = {sql_escape(login_normalized)}
+        """)
         
         print(f'🔍 Поиск пользователя: {login_normalized}')
         
@@ -507,7 +527,7 @@ def login_user(data: Dict[str, Any]) -> Dict[str, Any]:
             if is_valid:
                 print(f'🔄 Обновление хеша на bcrypt...')
                 new_hash = hash_password(password)
-                cur.execute('UPDATE users SET password_hash = %s WHERE id = %s', (new_hash, user['id']))
+                cur.execute(f"UPDATE users SET password_hash = {sql_escape(new_hash)} WHERE id = {user['id']}")
                 conn.commit()
         
         if not is_valid:
@@ -572,9 +592,10 @@ def reset_password(data: Dict[str, Any]) -> Dict[str, Any]:
     cur = conn.cursor(cursor_factory=RealDictCursor)
     
     try:
-        cur.execute("""
-            SELECT id FROM users WHERE email = %s OR phone = %s
-        """, (contact_normalized, contact_normalized))
+        cur.execute(f"""
+            SELECT id FROM users WHERE email = {sql_escape(contact_normalized)} 
+            OR phone = {sql_escape(contact_normalized)}
+        """)
         
         user = cur.fetchone()
         
@@ -595,10 +616,11 @@ def reset_password(data: Dict[str, Any]) -> Dict[str, Any]:
         code = generate_code()
         expires_at = datetime.now() + timedelta(minutes=10)
         
-        cur.execute("""
+        cur.execute(f"""
             INSERT INTO verification_codes (user_id, code, type, contact, expires_at)
-            VALUES (%s, %s, %s, %s, %s)
-        """, (user['id'], code, 'password_reset', contact_normalized, expires_at))
+            VALUES ({user['id']}, {sql_escape(code)}, 'password_reset', 
+                    {sql_escape(contact_normalized)}, {sql_escape(expires_at)})
+        """)
         
         conn.commit()
         print(f'✅ Код верификации сохранен: {code}')
@@ -660,13 +682,13 @@ def confirm_reset(data: Dict[str, Any]) -> Dict[str, Any]:
     cur = conn.cursor(cursor_factory=RealDictCursor)
     
     try:
-        cur.execute("""
+        cur.execute(f"""
             SELECT * FROM verification_codes
-            WHERE user_id = %s AND code = %s AND type = 'password_reset'
-                  AND used = FALSE AND expires_at > NOW()
+            WHERE user_id = {user_id} AND code = {sql_escape(code)} 
+            AND type = 'password_reset' AND used = FALSE AND expires_at > NOW()
             ORDER BY created_at DESC
             LIMIT 1
-        """, (user_id, code))
+        """)
         
         verification = cur.fetchone()
         
@@ -678,10 +700,18 @@ def confirm_reset(data: Dict[str, Any]) -> Dict[str, Any]:
                 'isBase64Encoded': False
             }
         
-        password_hash = hash_password(new_password)
-        cur.execute('UPDATE users SET password_hash = %s WHERE id = %s', (password_hash, user_id))
-        cur.execute('UPDATE verification_codes SET used = TRUE WHERE id = %s', (verification['id'],))
+        new_hash = hash_password(new_password)
         
+        cur.execute(f"UPDATE users SET password_hash = {sql_escape(new_hash)} WHERE id = {user_id}")
+        cur.execute(f"UPDATE verification_codes SET used = TRUE WHERE id = {verification['id']}")
+        
+        cur.execute(f"""
+            SELECT id, name, email, phone, role, balance, tier, vacancies_this_month,
+                   email_verified, phone_verified
+            FROM users WHERE id = {user_id}
+        """)
+        
+        user = cur.fetchone()
         conn.commit()
         
         return {
@@ -689,7 +719,19 @@ def confirm_reset(data: Dict[str, Any]) -> Dict[str, Any]:
             'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
             'body': json.dumps({
                 'success': True,
-                'message': 'Пароль успешно изменен'
+                'message': 'Пароль успешно изменен',
+                'user': {
+                    'id': str(user['id']),
+                    'name': user['name'],
+                    'email': user['email'],
+                    'phone': user['phone'],
+                    'role': user['role'],
+                    'balance': float(user['balance']),
+                    'tier': user['tier'],
+                    'vacancies_this_month': user['vacancies_this_month'],
+                    'email_verified': user['email_verified'],
+                    'phone_verified': user['phone_verified']
+                }
             }),
             'isBase64Encoded': False
         }
@@ -697,6 +739,51 @@ def confirm_reset(data: Dict[str, Any]) -> Dict[str, Any]:
     except Exception as e:
         conn.rollback()
         raise e
+    finally:
+        cur.close()
+        conn.close()
+
+
+def get_user(user_id: str) -> Dict[str, Any]:
+    """Получение информации о пользователе"""
+    conn = get_db_connection()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    
+    try:
+        cur.execute(f"""
+            SELECT id, name, email, phone, role, balance, tier, vacancies_this_month,
+                   email_verified, phone_verified
+            FROM users WHERE id = {sql_escape(user_id)}
+        """)
+        
+        user = cur.fetchone()
+        
+        if not user:
+            return {
+                'statusCode': 404,
+                'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
+                'body': json.dumps({'error': 'Пользователь не найден'}),
+                'isBase64Encoded': False
+            }
+        
+        return {
+            'statusCode': 200,
+            'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
+            'body': json.dumps({
+                'id': str(user['id']),
+                'name': user['name'],
+                'email': user['email'],
+                'phone': user['phone'],
+                'role': user['role'],
+                'balance': float(user['balance']),
+                'tier': user['tier'],
+                'vacancies_this_month': user['vacancies_this_month'],
+                'email_verified': user['email_verified'],
+                'phone_verified': user['phone_verified']
+            }),
+            'isBase64Encoded': False
+        }
+        
     finally:
         cur.close()
         conn.close()
@@ -727,26 +814,7 @@ def link_email(data: Dict[str, Any]) -> Dict[str, Any]:
     cur = conn.cursor(cursor_factory=RealDictCursor)
     
     try:
-        cur.execute('SELECT id, email FROM users WHERE id = %s', (user_id,))
-        user = cur.fetchone()
-        
-        if not user:
-            return {
-                'statusCode': 404,
-                'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
-                'body': json.dumps({'error': 'Пользователь не найден'}),
-                'isBase64Encoded': False
-            }
-        
-        if user['email']:
-            return {
-                'statusCode': 400,
-                'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
-                'body': json.dumps({'error': 'Email уже привязан к аккаунту'}),
-                'isBase64Encoded': False
-            }
-        
-        cur.execute('SELECT id FROM users WHERE email = %s', (email,))
+        cur.execute(f"SELECT id FROM users WHERE email = {sql_escape(email)}")
         if cur.fetchone():
             return {
                 'statusCode': 400,
@@ -758,14 +826,15 @@ def link_email(data: Dict[str, Any]) -> Dict[str, Any]:
         code = generate_code()
         expires_at = datetime.now() + timedelta(minutes=10)
         
-        cur.execute("""
+        cur.execute(f"""
             INSERT INTO verification_codes (user_id, code, type, contact, expires_at)
-            VALUES (%s, %s, %s, %s, %s)
-        """, (user_id, code, 'email', email, expires_at))
+            VALUES ({user_id}, {sql_escape(code)}, 'email_link', 
+                    {sql_escape(email)}, {sql_escape(expires_at)})
+        """)
         
         conn.commit()
         
-        success, message = send_email(email, code, 'verification')
+        success, message = send_email(email, code)
         
         return {
             'statusCode': 200,
@@ -787,7 +856,7 @@ def link_email(data: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def verify_email_link(data: Dict[str, Any]) -> Dict[str, Any]:
-    """Подтверждение кода для привязки email"""
+    """Подтверждение привязки email"""
     user_id = data.get('user_id')
     code = data.get('code', '').strip()
     
@@ -803,13 +872,13 @@ def verify_email_link(data: Dict[str, Any]) -> Dict[str, Any]:
     cur = conn.cursor(cursor_factory=RealDictCursor)
     
     try:
-        cur.execute("""
+        cur.execute(f"""
             SELECT * FROM verification_codes
-            WHERE user_id = %s AND code = %s AND type = 'email' 
-                  AND used = FALSE AND expires_at > NOW()
+            WHERE user_id = {user_id} AND code = {sql_escape(code)} 
+            AND type = 'email_link' AND used = FALSE AND expires_at > NOW()
             ORDER BY created_at DESC
             LIMIT 1
-        """, (user_id, code))
+        """)
         
         verification = cur.fetchone()
         
@@ -823,14 +892,20 @@ def verify_email_link(data: Dict[str, Any]) -> Dict[str, Any]:
         
         email = verification['contact']
         
-        cur.execute("""
+        cur.execute(f"""
             UPDATE users 
-            SET email = %s, email_verified = TRUE 
-            WHERE id = %s
-        """, (email, user_id))
+            SET email = {sql_escape(email)}, email_verified = TRUE 
+            WHERE id = {user_id}
+        """)
+        cur.execute(f"UPDATE verification_codes SET used = TRUE WHERE id = {verification['id']}")
         
-        cur.execute('UPDATE verification_codes SET used = TRUE WHERE id = %s', (verification['id'],))
+        cur.execute(f"""
+            SELECT id, name, email, phone, role, balance, tier, vacancies_this_month,
+                   email_verified, phone_verified
+            FROM users WHERE id = {user_id}
+        """)
         
+        user = cur.fetchone()
         conn.commit()
         
         return {
@@ -838,47 +913,7 @@ def verify_email_link(data: Dict[str, Any]) -> Dict[str, Any]:
             'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
             'body': json.dumps({
                 'success': True,
-                'email': email,
-                'message': 'Email успешно привязан'
-            }),
-            'isBase64Encoded': False
-        }
-        
-    except Exception as e:
-        conn.rollback()
-        raise e
-    finally:
-        cur.close()
-        conn.close()
-
-
-def get_user(user_id: str) -> Dict[str, Any]:
-    """Получение данных пользователя по ID"""
-    conn = get_db_connection()
-    cur = conn.cursor(cursor_factory=RealDictCursor)
-    
-    try:
-        cur.execute("""
-            SELECT id, name, email, phone, role, balance, tier, tier_expires_at,
-                   vacancies_this_month, email_verified, phone_verified, created_at
-            FROM users WHERE id = %s
-        """, (user_id,))
-        
-        user = cur.fetchone()
-        
-        if not user:
-            return {
-                'statusCode': 404,
-                'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
-                'body': json.dumps({'error': 'Пользователь не найден'}),
-                'isBase64Encoded': False
-            }
-        
-        return {
-            'statusCode': 200,
-            'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
-            'body': json.dumps({
-                'success': True,
+                'message': 'Email успешно привязан',
                 'user': {
                     'id': str(user['id']),
                     'name': user['name'],
@@ -887,16 +922,17 @@ def get_user(user_id: str) -> Dict[str, Any]:
                     'role': user['role'],
                     'balance': float(user['balance']),
                     'tier': user['tier'],
-                    'tier_expires_at': user['tier_expires_at'].isoformat() if user['tier_expires_at'] else None,
                     'vacancies_this_month': user['vacancies_this_month'],
                     'email_verified': user['email_verified'],
-                    'phone_verified': user['phone_verified'],
-                    'created_at': user['created_at'].isoformat()
+                    'phone_verified': user['phone_verified']
                 }
             }),
             'isBase64Encoded': False
         }
         
+    except Exception as e:
+        conn.rollback()
+        raise e
     finally:
         cur.close()
         conn.close()
