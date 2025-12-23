@@ -25,16 +25,20 @@ def get_db_connection():
 
 
 def sql_escape(value: Any) -> str:
-    """Экранирует значение для использования в SQL через psycopg2"""
+    """Экранирует значение для использования в SQL с поддержкой UTF-8"""
     if value is None:
         return 'NULL'
     if isinstance(value, bool):
         return 'TRUE' if value else 'FALSE'
     if isinstance(value, (int, float)):
         return str(value)
-    # Используем psycopg2.adapt для корректного экранирования всех типов
-    adapted = adapt(value)
-    return adapted.getquoted().decode('utf-8')
+    if isinstance(value, datetime):
+        return f"'{value.isoformat()}'"
+    # Для строк: экранируем ' -> '' и оборачиваем в E'...' для поддержки спецсимволов
+    str_value = str(value)
+    # Экранируем обратный слэш и одинарные кавычки
+    str_value = str_value.replace('\\', '\\\\').replace("'", "''")
+    return f"E'{str_value}'"
 
 
 def hash_password(password: str) -> str:
