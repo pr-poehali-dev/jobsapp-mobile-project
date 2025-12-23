@@ -33,15 +33,11 @@ def sql_escape(value: Any) -> str:
     if isinstance(value, (int, float)):
         return str(value)
     if isinstance(value, datetime):
-        return f"'{value.isoformat()}'"
-    # Для строк используем dollar-quoted strings с тегом для безопасности
-    str_value = str(value)
-    # Используем уникальный тег, который вряд ли встретится в данных
-    tag = 'qXz9'
-    # Проверяем, что тег не содержится в строке (на всякий случай)
-    while f'${tag}$' in str_value:
-        tag += 'X'
-    return f'${tag}${str_value}${tag}$'
+        # Для datetime используем простое форматирование
+        return "'" + value.isoformat() + "'"
+    # Для строк: экранируем одинарные кавычки удвоением
+    str_value = str(value).replace("'", "''")
+    return "'" + str_value + "'"
 
 
 def hash_password(password: str) -> str:
