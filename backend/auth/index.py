@@ -33,11 +33,11 @@ def sql_escape(value: Any) -> str:
     if isinstance(value, (int, float)):
         return str(value)
     if isinstance(value, datetime):
-        # Для datetime используем простое форматирование
-        return "'" + value.isoformat() + "'"
-    # Для строк: экранируем одинарные кавычки удвоением
+        # Для datetime используем явное приведение типа
+        return "'" + value.isoformat() + "'::timestamp"
+    # Для строк: экранируем кавычки и добавляем явное приведение к text
     str_value = str(value).replace("'", "''")
-    return "'" + str_value + "'"
+    return "'" + str_value + "'::text"
 
 
 def hash_password(password: str) -> str:
