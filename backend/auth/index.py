@@ -10,6 +10,7 @@ from typing import Dict, Any
 from datetime import datetime, timedelta
 import psycopg2
 from psycopg2.extras import RealDictCursor
+from psycopg2.extensions import adapt, AsIs
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
@@ -24,21 +25,16 @@ def get_db_connection():
 
 
 def sql_escape(value: Any) -> str:
-    """Экранирует значение для использования в SQL"""
+    """Экранирует значение для использования в SQL через psycopg2"""
     if value is None:
         return 'NULL'
     if isinstance(value, bool):
         return 'TRUE' if value else 'FALSE'
     if isinstance(value, (int, float)):
         return str(value)
-    if isinstance(value, datetime):
-        return f"'{value.isoformat()}'"
-    # Для строк используем $$ для экранирования (для bcrypt хешей с $ внутри)
-    str_value = str(value)
-    if '$' in str_value or '\\' in str_value:
-        return f"$${str_value}$$"
-    # Для обычных строк экранируем одинарные кавычки
-    return f"'{str_value.replace(chr(39), chr(39) + chr(39))}'"
+    # Используем psycopg2.adapt для корректного экранирования всех типов
+    adapted = adapt(value)
+    return adapted.getquoted().decode('utf-8')
 
 
 def hash_password(password: str) -> str:
