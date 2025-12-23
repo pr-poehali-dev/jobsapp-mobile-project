@@ -33,8 +33,12 @@ def sql_escape(value: Any) -> str:
         return str(value)
     if isinstance(value, datetime):
         return f"'{value.isoformat()}'"
-    # Для строк экранируем одинарные кавычки
-    return f"'{str(value).replace(chr(39), chr(39) + chr(39))}'"
+    # Для строк используем $$ для экранирования (для bcrypt хешей с $ внутри)
+    str_value = str(value)
+    if '$' in str_value or '\\' in str_value:
+        return f"$${str_value}$$"
+    # Для обычных строк экранируем одинарные кавычки
+    return f"'{str_value.replace(chr(39), chr(39) + chr(39))}'"
 
 
 def hash_password(password: str) -> str:
