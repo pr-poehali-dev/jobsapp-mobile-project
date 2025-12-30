@@ -32,7 +32,6 @@ export function AuthSystem({ open, onClose, onSuccess }: AuthSystemProps) {
     // Используем роль из backend (если есть) или выбранную при регистрации
     const finalRole = user.role || selectedRole || 'seeker';
     localStorage.setItem('auth_token', token);
-    localStorage.setItem('user', JSON.stringify({ ...user, role: finalRole }));
     
     toast({
       title: 'Вход выполнен',
