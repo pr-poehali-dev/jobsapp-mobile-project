@@ -8,9 +8,10 @@ import { useState } from 'react';
 interface RegisterFormProps {
   onSuccess: (token: string, user: any) => void;
   onSwitchToLogin?: () => void;
+  role: 'seeker' | 'employer';
 }
 
-export function RegisterForm({ onSuccess, onSwitchToLogin }: RegisterFormProps) {
+export function RegisterForm({ onSuccess, onSwitchToLogin, role }: RegisterFormProps) {
   const [step, setStep] = useState<'contact' | 'code'>('contact');
   const [contact, setContact] = useState('');
   const [code, setCode] = useState('');
@@ -155,7 +156,9 @@ export function RegisterForm({ onSuccess, onSwitchToLogin }: RegisterFormProps) 
   return (
     <div className="space-y-4">
       <div className="text-center mb-4">
-        <h3 className="text-lg font-semibold">Регистрация</h3>
+        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 text-primary text-sm font-medium mb-2">
+          {role === 'employer' ? '👔 Работодатель' : '👤 Соискатель'}
+        </div>
         <p className="text-sm text-muted-foreground">
           Мы отправим код подтверждения
         </p>
