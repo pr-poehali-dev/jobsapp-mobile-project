@@ -33,12 +33,21 @@ export function AuthSystem({ open, onClose, onSuccess }: AuthSystemProps) {
     const finalRole = user.role || selectedRole || 'seeker';
     localStorage.setItem('auth_token', token);
     
+    // Дополняем пользователя обязательными полями для работодателя
+    const fullUser = {
+      ...user,
+      role: finalRole,
+      balance: user.balance || 0,
+      tier: user.tier || 'FREE',
+      vacanciesThisMonth: user.vacanciesThisMonth || 0
+    };
+    
     toast({
       title: 'Вход выполнен',
       description: `Добро пожаловать${user.full_name ? ', ' + user.full_name : ''}!`
     });
     
-    onSuccess({ ...user, role: finalRole });
+    onSuccess(fullUser);
     onClose();
   };
 
