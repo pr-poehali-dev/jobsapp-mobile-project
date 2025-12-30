@@ -6,6 +6,7 @@ import json
 import os
 import secrets
 import re
+import traceback
 from typing import Dict, Any, Tuple
 from datetime import datetime, timedelta
 import psycopg2
@@ -272,6 +273,8 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             contact = body.get('contact', '').strip()
             code = body.get('code', '').strip()
             
+            print(f'[DEBUG] verify-code: contact={contact}, code={code}')
+            
             if not contact or not code:
                 return {
                     'statusCode': 400,
@@ -283,6 +286,8 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             # Нормализуем контакт
             is_email = '@' in contact
             normalized_contact = contact.lower() if is_email else normalize_phone(contact)
+            
+            print(f'[DEBUG] normalized_contact={normalized_contact}, is_email={is_email}')
             
             # Проверяем код
             cur.execute("""
@@ -296,6 +301,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             """, (normalized_contact, code))
             
             otp = cur.fetchone()
+            print(f'[DEBUG] otp found: {otp is not None}')
             
             if not otp:
                 # Увеличиваем счетчик попыток
@@ -315,6 +321,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 }
             
             # Отмечаем код как использованный
+            print(f'[DEBUG] Marking OTP as used, otp_id={otp["id"]}')
             cur.execute("UPDATE otp_codes SET is_used = TRUE WHERE id = %s", (otp['id'],))
             conn.commit()
             
@@ -325,9 +332,11 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 cur.execute("SELECT id, phone, email, full_name, is_verified FROM users WHERE phone = %s", (normalized_contact,))
             
             user = cur.fetchone()
+            print(f'[DEBUG] user found: {user is not None}')
             
             if not user:
                 # Создаем нового пользователя
+                print(f'[DEBUG] Creating new user')
                 if is_email:
                     cur.execute("""
                         INSERT INTO users (email, is_verified, last_login)
@@ -341,9 +350,11 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                         RETURNING id, phone, email, full_name, is_verified
                     """, (normalized_contact,))
                 user = cur.fetchone()
+                print(f'[DEBUG] New user created: user_id={user["id"] if user else None}')
                 conn.commit()
             else:
                 # Обновляем last_login
+                print(f'[DEBUG] Updating existing user, user_id={user["id"]}')
                 cur.execute("UPDATE users SET last_login = NOW(), is_verified = TRUE WHERE id = %s", (user['id'],))
                 conn.commit()
             
@@ -351,11 +362,13 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             token = generate_token()
             expires_at = datetime.now() + timedelta(days=30)
             
+            print(f'[DEBUG] Creating session for user_id={user["id"]}')
             cur.execute("""
                 INSERT INTO sessions (user_id, token, expires_at)
                 VALUES (%s, %s, %s)
             """, (user['id'], token, expires_at))
             conn.commit()
+            print(f'[DEBUG] Session created successfully')
             conn.close()
             
             return {
@@ -433,9 +446,15 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             }
     
     except Exception as e:
+        error_traceback = traceback.format_exc()
+        print(f'[ERROR] Exception occurred: {str(e)}')
+        print(f'[ERROR] Traceback:\n{error_traceback}')
         return {
             'statusCode': 500,
             'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
-            'body': json.dumps({'error': f'Ошибка сервера: {str(e)}'}),
+            'body': json.dumps({
+                'error': f'Ошибка сервера: {str(e)}',
+                'details': error_traceback if os.environ.get('DEBUG') else None
+            }),
             'isBase64Encoded': False
         }
