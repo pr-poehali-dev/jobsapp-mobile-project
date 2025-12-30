@@ -911,19 +911,9 @@ export default function Index() {
         <ProfileSettings
           open={showProfileSettingsDialog}
           onClose={() => setShowProfileSettingsDialog(false)}
-          user={{
-            id: parseInt(currentUser.id),
-            phone: currentUser.phone,
-            email: currentUser.email,
-            full_name: currentUser.name,
-            is_verified: true,
-            role: currentUser.role === 'employer' ? 'employer' : 'seeker'
-          }}
+          user={currentUser}
           onUpdate={(updatedUser) => {
-            setCurrentUser({
-              ...currentUser,
-              role: updatedUser.role === 'employer' ? 'employer' : updatedUser.role === 'seeker' ? 'seeker' : currentUser.role
-            });
+            setCurrentUser(updatedUser);
           }}
         />
       )}
