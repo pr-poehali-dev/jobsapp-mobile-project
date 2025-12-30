@@ -320,9 +320,9 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             
             # Ищем или создаем пользователя
             if is_email:
-                cur.execute("SELECT * FROM users WHERE email = %s", (normalized_contact,))
+                cur.execute("SELECT id, phone, email, full_name, is_verified FROM users WHERE email = %s", (normalized_contact,))
             else:
-                cur.execute("SELECT * FROM users WHERE phone = %s", (normalized_contact,))
+                cur.execute("SELECT id, phone, email, full_name, is_verified FROM users WHERE phone = %s", (normalized_contact,))
             
             user = cur.fetchone()
             
@@ -332,13 +332,13 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                     cur.execute("""
                         INSERT INTO users (email, is_verified, last_login)
                         VALUES (%s, TRUE, NOW())
-                        RETURNING *
+                        RETURNING id, phone, email, full_name, is_verified
                     """, (normalized_contact,))
                 else:
                     cur.execute("""
                         INSERT INTO users (phone, is_verified, last_login)
                         VALUES (%s, TRUE, NOW())
-                        RETURNING *
+                        RETURNING id, phone, email, full_name, is_verified
                     """, (normalized_contact,))
                 user = cur.fetchone()
                 conn.commit()
@@ -354,9 +354,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             cur.execute("""
                 INSERT INTO sessions (user_id, token, expires_at)
                 VALUES (%s, %s, %s)
-                RETURNING *
             """, (user['id'], token, expires_at))
-            session = cur.fetchone()
             conn.commit()
             conn.close()
             
@@ -368,10 +366,10 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                     'token': token,
                     'user': {
                         'id': user['id'],
-                        'phone': user['phone'],
-                        'email': user['email'],
-                        'full_name': user['full_name'],
-                        'is_verified': user['is_verified']
+                        'phone': user.get('phone'),
+                        'email': user.get('email'),
+                        'full_name': user.get('full_name'),
+                        'is_verified': user.get('is_verified', False)
                     }
                 }),
                 'isBase64Encoded': False
