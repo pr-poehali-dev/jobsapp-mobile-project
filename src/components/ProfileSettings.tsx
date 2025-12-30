@@ -59,7 +59,6 @@ export function ProfileSettings({ open, onClose, user, onUpdate }: ProfileSettin
       }
 
       const updatedUser = { ...user, role: selectedRole };
-      localStorage.setItem('user', JSON.stringify(updatedUser));
       onUpdate(updatedUser);
 
       toast({
