@@ -42,7 +42,7 @@ export function EmployerBottomNav({ currentUser, vacancies, onTierClick, onDelet
     'PREMIUM': { name: 'Premium', price: 2500, limit: 150, badge: '👑', color: 'bg-amber-500' }
   };
 
-  const currentTier = tierInfo[currentUser.tier];
+  const currentTier = tierInfo[currentUser?.tier || 'ECONOM'];
 
   return (
     <>
