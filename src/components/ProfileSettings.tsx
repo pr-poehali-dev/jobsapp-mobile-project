@@ -8,12 +8,14 @@ import Icon from '@/components/ui/icon';
 type UserRole = 'seeker' | 'employer';
 
 interface User {
-  id: number;
-  phone: string | null;
+  id: string;
+  name: string;
   email: string | null;
-  full_name: string | null;
-  is_verified: boolean;
-  role: UserRole;
+  phone: string | null;
+  role: 'guest' | 'seeker' | 'employer' | 'admin';
+  balance: number;
+  tier: 'FREE' | 'ECONOM' | 'VIP' | 'PREMIUM';
+  vacanciesThisMonth: number;
 }
 
 interface ProfileSettingsProps {
@@ -24,7 +26,9 @@ interface ProfileSettingsProps {
 }
 
 export function ProfileSettings({ open, onClose, user, onUpdate }: ProfileSettingsProps) {
-  const [selectedRole, setSelectedRole] = useState<UserRole>(user.role);
+  const [selectedRole, setSelectedRole] = useState<UserRole>(
+    user.role === 'employer' || user.role === 'seeker' ? user.role : 'seeker'
+  );
   const [loading, setLoading] = useState(false);
 
   const handleSave = async () => {
