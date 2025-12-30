@@ -225,7 +225,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 UPDATE {SCHEMA}.users 
                 SET role = %s 
                 WHERE id = %s
-                RETURNING id, phone, email, full_name, is_verified, role
+                RETURNING id, phone, email, name, email_verified, phone_verified, role
             """, (role, session['user_id']))
             
             user = cur.fetchone()
@@ -238,11 +238,11 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 'body': json.dumps({
                     'success': True,
                     'user': {
-                        'id': str(user['id']),  # UUID to string
+                        'id': str(user['id']),
                         'phone': user.get('phone'),
                         'email': user.get('email'),
                         'full_name': user.get('name'),
-                        'is_verified': True,
+                        'is_verified': user.get('email_verified') or user.get('phone_verified', False),
                         'role': user.get('role', 'seeker')
                     }
                 }),
