@@ -23,6 +23,9 @@ def get_db_connection():
     return psycopg2.connect(os.environ['DATABASE_URL'])
 
 
+SCHEMA = '"t_p41246523_jobsapp_mobile_proje"'
+
+
 def generate_code() -> str:
     """Генерирует 6-значный код"""
     return ''.join([str(secrets.randbelow(10)) for _ in range(6)])
@@ -214,8 +217,8 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 normalized_contact = normalize_phone(contact)
             
             # Проверяем лимит запросов (не более 3 кодов за 10 минут)
-            cur.execute("""
-                SELECT COUNT(*) as count FROM otp_codes 
+            cur.execute(f"""
+                SELECT COUNT(*) as count FROM {SCHEMA}.otp_codes 
                 WHERE contact = %s 
                 AND created_at > NOW() - INTERVAL '10 minutes'
             """, (normalized_contact,))
@@ -235,8 +238,8 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             expires_at = datetime.now() + timedelta(minutes=10)
             
             # Сохраняем код
-            cur.execute("""
-                INSERT INTO otp_codes (contact, contact_type, code, purpose, expires_at)
+            cur.execute(f"""
+                INSERT INTO {SCHEMA}.otp_codes (contact, contact_type, code, purpose, expires_at)
                 VALUES (%s, %s, %s, %s, %s)
             """, (normalized_contact, contact_type, code, 'login', expires_at))
             conn.commit()
@@ -290,8 +293,8 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             print(f'[DEBUG] normalized_contact={normalized_contact}, is_email={is_email}')
             
             # Проверяем код
-            cur.execute("""
-                SELECT * FROM otp_codes 
+            cur.execute(f"""
+                SELECT * FROM {SCHEMA}.otp_codes 
                 WHERE contact = %s 
                 AND code = %s 
                 AND is_used = FALSE 
@@ -305,8 +308,8 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             
             if not otp:
                 # Увеличиваем счетчик попыток
-                cur.execute("""
-                    UPDATE otp_codes 
+                cur.execute(f"""
+                    UPDATE {SCHEMA}.otp_codes 
                     SET attempts = attempts + 1 
                     WHERE contact = %s AND code = %s
                 """, (normalized_contact, code))
@@ -322,14 +325,14 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             
             # Отмечаем код как использованный
             print(f'[DEBUG] Marking OTP as used, otp_id={otp["id"]}')
-            cur.execute("UPDATE otp_codes SET is_used = TRUE WHERE id = %s", (otp['id'],))
+            cur.execute(f"UPDATE {SCHEMA}.otp_codes SET is_used = TRUE WHERE id = %s", (otp['id'],))
             conn.commit()
             
             # Ищем или создаем пользователя
             if is_email:
-                cur.execute("SELECT id, phone, email, full_name, is_verified FROM users WHERE email = %s", (normalized_contact,))
+                cur.execute(f"SELECT id, phone, email, full_name, is_verified FROM {SCHEMA}.users WHERE email = %s", (normalized_contact,))
             else:
-                cur.execute("SELECT id, phone, email, full_name, is_verified FROM users WHERE phone = %s", (normalized_contact,))
+                cur.execute(f"SELECT id, phone, email, full_name, is_verified FROM {SCHEMA}.users WHERE phone = %s", (normalized_contact,))
             
             user = cur.fetchone()
             print(f'[DEBUG] user found: {user is not None}')
@@ -338,14 +341,14 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 # Создаем нового пользователя
                 print(f'[DEBUG] Creating new user')
                 if is_email:
-                    cur.execute("""
-                        INSERT INTO users (email, is_verified, last_login)
+                    cur.execute(f"""
+                        INSERT INTO {SCHEMA}.users (email, is_verified, last_login)
                         VALUES (%s, TRUE, NOW())
                         RETURNING id, phone, email, full_name, is_verified
                     """, (normalized_contact,))
                 else:
-                    cur.execute("""
-                        INSERT INTO users (phone, is_verified, last_login)
+                    cur.execute(f"""
+                        INSERT INTO {SCHEMA}.users (phone, is_verified, last_login)
                         VALUES (%s, TRUE, NOW())
                         RETURNING id, phone, email, full_name, is_verified
                     """, (normalized_contact,))
@@ -355,7 +358,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             else:
                 # Обновляем last_login
                 print(f'[DEBUG] Updating existing user, user_id={user["id"]}')
-                cur.execute("UPDATE users SET last_login = NOW(), is_verified = TRUE WHERE id = %s", (user['id'],))
+                cur.execute(f"UPDATE {SCHEMA}.users SET last_login = NOW(), is_verified = TRUE WHERE id = %s", (user['id'],))
                 conn.commit()
             
             # Создаем сессию
@@ -363,8 +366,8 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             expires_at = datetime.now() + timedelta(days=30)
             
             print(f'[DEBUG] Creating session for user_id={user["id"]}')
-            cur.execute("""
-                INSERT INTO sessions (user_id, token, expires_at)
+            cur.execute(f"""
+                INSERT INTO {SCHEMA}.sessions (user_id, token, expires_at)
                 VALUES (%s, %s, %s)
             """, (user['id'], token, expires_at))
             conn.commit()
@@ -400,10 +403,10 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                     'isBase64Encoded': False
                 }
             
-            cur.execute("""
+            cur.execute(f"""
                 SELECT s.*, u.* 
-                FROM sessions s
-                JOIN users u ON s.user_id = u.id
+                FROM {SCHEMA}.sessions s
+                JOIN {SCHEMA}.users u ON s.user_id = u.id
                 WHERE s.token = %s 
                 AND s.is_active = TRUE 
                 AND s.expires_at > NOW()
