@@ -1,34 +1,29 @@
 {
   "tests": [
     {
-      "name": "Регистрация с email",
+      "name": "Отправка кода на email",
       "method": "POST",
-      "path": "register",
+      "path": "/?path=send-code",
       "body": {
-        "name": "Тестовый Пользователь",
-        "email": "test@example.com",
-        "password": "password123",
-        "role": "seeker",
-        "verification_type": "email"
+        "contact": "test@example.com"
       },
-      "expectedStatus": 201,
+      "expectedStatus": 200,
       "expectedBody": {
         "success": true,
-        "user_id": "string"
+        "contact_type": "email"
       },
       "bodyMatcher": "partial"
     },
     {
-      "name": "Вход пользователя",
+      "name": "Проверка формата email",
       "method": "POST",
-      "path": "login",
+      "path": "/?path=send-code",
       "body": {
-        "login": "test@example.com",
-        "password": "password123"
+        "contact": "invalid-email"
       },
-      "expectedStatus": 200,
+      "expectedStatus": 400,
       "expectedBody": {
-        "success": true
+        "error": "string"
       },
       "bodyMatcher": "partial"
     }
