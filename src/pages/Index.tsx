@@ -19,6 +19,7 @@ import { TransactionHistory } from '@/components/TransactionHistory';
 import { CitySelector } from '@/components/CitySelector';
 import { EmployerBottomNav } from '@/components/EmployerBottomNav';
 import { InstallPrompt } from '@/components/InstallPrompt';
+import { ProfileSettings } from '@/components/ProfileSettings';
 import { getAllCities } from '@/data/cities';
 
 interface CitySearchInputProps {
@@ -128,6 +129,7 @@ export default function Index() {
   const [currentVacancyIndex, setCurrentVacancyIndex] = useState(0);
   const [showAuthDialog, setShowAuthDialog] = useState(false);
   const [showProfileDialog, setShowProfileDialog] = useState(false);
+  const [showProfileSettingsDialog, setShowProfileSettingsDialog] = useState(false);
   const [showBalanceDialog, setShowBalanceDialog] = useState(false);
   const [showVacancyDialog, setShowVacancyDialog] = useState(false);
   const [showAdminDialog, setShowAdminDialog] = useState(false);
@@ -900,7 +902,31 @@ export default function Index() {
             description: 'Вы успешно вышли из системы'
           });
         }}
+        onOpenSettings={() => {
+          setShowProfileDialog(false);
+          setShowProfileSettingsDialog(true);
+        }}
       />
+      {currentUser && (
+        <ProfileSettings
+          open={showProfileSettingsDialog}
+          onClose={() => setShowProfileSettingsDialog(false)}
+          user={{
+            id: parseInt(currentUser.id),
+            phone: currentUser.phone,
+            email: currentUser.email,
+            full_name: currentUser.name,
+            is_verified: true,
+            role: currentUser.role === 'employer' ? 'employer' : 'seeker'
+          }}
+          onUpdate={(updatedUser) => {
+            setCurrentUser({
+              ...currentUser,
+              role: updatedUser.role === 'employer' ? 'employer' : updatedUser.role === 'seeker' ? 'seeker' : currentUser.role
+            });
+          }}
+        />
+      )}
       <BalanceTopUp 
         open={showBalanceDialog} 
         onClose={() => setShowBalanceDialog(false)} 
@@ -1074,7 +1100,7 @@ function VacancyCard({ vacancy, currentUser, onAuthClick }: { vacancy: Vacancy; 
   );
 }
 
-function ProfileDialog({ open, onClose, user, onAddBalance, onSelectTier, onCreateVacancy, onLinkEmail, onUpdateVacanciesCount, onLogout }: { open: boolean; onClose: () => void; user: User | null; onAddBalance: () => void; onSelectTier: () => void; onCreateVacancy?: () => void; onLinkEmail: () => void; onUpdateVacanciesCount: (count: number) => void; onLogout: () => void }) {
+function ProfileDialog({ open, onClose, user, onAddBalance, onSelectTier, onCreateVacancy, onLinkEmail, onUpdateVacanciesCount, onLogout, onOpenSettings }: { open: boolean; onClose: () => void; user: User | null; onAddBalance: () => void; onSelectTier: () => void; onCreateVacancy?: () => void; onLinkEmail: () => void; onUpdateVacanciesCount: (count: number) => void; onLogout: () => void; onOpenSettings: () => void }) {
   const [userVacancies, setUserVacancies] = useState<Vacancy[]>([]);
   const [isLoadingVacancies, setIsLoadingVacancies] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
@@ -1174,11 +1200,20 @@ function ProfileDialog({ open, onClose, user, onAddBalance, onSelectTier, onCrea
             <Label>Имя</Label>
             <p className="text-sm mt-1">{user.name}</p>
           </div>
-          <div>
-            <Label>Роль</Label>
-            <p className="text-sm mt-1">
-              {user.role === 'seeker' ? 'Соискатель' : user.role === 'employer' ? 'Работодатель' : 'Администратор'}
-            </p>
+          <div className="flex items-center justify-between">
+            <div>
+              <Label>Роль</Label>
+              <p className="text-sm mt-1">
+                {user.role === 'seeker' ? '👤 Соискатель' : user.role === 'employer' ? '👔 Работодатель' : 'Администратор'}
+              </p>
+            </div>
+            <Button 
+              size="sm" 
+              variant="outline"
+              onClick={onOpenSettings}
+            >
+              Изменить
+            </Button>
           </div>
           <div className="flex items-center justify-between">
             <div className="flex-1">

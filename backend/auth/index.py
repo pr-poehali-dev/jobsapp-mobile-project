@@ -156,7 +156,7 @@ def send_sms(phone: str, code: str) -> Tuple[bool, str]:
 def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     """
     API аутентификации через одноразовые коды
-    Endpoints: /send-code, /verify-code, /check-session
+    Endpoints: /send-code, /verify-code, /check-session, /update-role
     """
     method = event.get('httpMethod', 'GET')
     
@@ -181,9 +181,78 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         conn = get_db_connection()
         cur = conn.cursor(cursor_factory=RealDictCursor)
         
+        # Обновление роли пользователя
+        if path == 'update-role' and method == 'POST':
+            token = event.get('headers', {}).get('X-Session-Token') or body.get('token')
+            role = body.get('role')
+            
+            if not token:
+                return {
+                    'statusCode': 401,
+                    'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
+                    'body': json.dumps({'error': 'Токен не указан'}),
+                    'isBase64Encoded': False
+                }
+            
+            if role not in ['seeker', 'employer']:
+                return {
+                    'statusCode': 400,
+                    'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
+                    'body': json.dumps({'error': 'Неверная роль'}),
+                    'isBase64Encoded': False
+                }
+            
+            # Проверяем сессию
+            cur.execute(f"""
+                SELECT s.user_id FROM {SCHEMA}.sessions s
+                WHERE s.token = %s 
+                AND s.is_active = TRUE 
+                AND s.expires_at > NOW()
+            """, (token,))
+            
+            session = cur.fetchone()
+            if not session:
+                conn.close()
+                return {
+                    'statusCode': 401,
+                    'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
+                    'body': json.dumps({'error': 'Сессия недействительна'}),
+                    'isBase64Encoded': False
+                }
+            
+            # Обновляем роль
+            cur.execute(f"""
+                UPDATE {SCHEMA}.users 
+                SET role = %s 
+                WHERE id = %s
+                RETURNING id, phone, email, full_name, is_verified, role
+            """, (role, session['user_id']))
+            
+            user = cur.fetchone()
+            conn.commit()
+            conn.close()
+            
+            return {
+                'statusCode': 200,
+                'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
+                'body': json.dumps({
+                    'success': True,
+                    'user': {
+                        'id': str(user['id']),  # UUID to string
+                        'phone': user.get('phone'),
+                        'email': user.get('email'),
+                        'full_name': user.get('name'),
+                        'is_verified': True,
+                        'role': user.get('role', 'seeker')
+                    }
+                }),
+                'isBase64Encoded': False
+            }
+        
         # Отправка кода
         if path == 'send-code' and method == 'POST':
             contact = body.get('contact', '').strip()
+            role = body.get('role', 'seeker')
             
             if not contact:
                 return {
@@ -237,11 +306,13 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             code = generate_code()
             expires_at = datetime.now() + timedelta(minutes=10)
             
-            # Сохраняем код
+            # Сохраняем код с purpose='login' (constraint требует только эти значения)
+            # Роль сохраняем в код самом (последний символ: 0-5=seeker, 6-9=employer)
+            # Но лучше просто использовать role из параметра при создании пользователя
             cur.execute(f"""
                 INSERT INTO {SCHEMA}.otp_codes (contact, contact_type, code, purpose, expires_at)
-                VALUES (%s, %s, %s, %s, %s)
-            """, (normalized_contact, contact_type, code, 'login', expires_at))
+                VALUES (%s, %s, %s, 'login', %s)
+            """, (normalized_contact, contact_type, code, expires_at))
             conn.commit()
             
             # Отправляем код
@@ -328,37 +399,45 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             cur.execute(f"UPDATE {SCHEMA}.otp_codes SET is_used = TRUE WHERE id = %s", (otp['id'],))
             conn.commit()
             
-            # Ищем или создаем пользователя
+            # Роль берем из body (она была передана вместе с кодом)
+            role = body.get('role', 'seeker')
+            if role not in ['seeker', 'employer']:
+                role = 'seeker'
+            
+            # Ищем или создаем пользователя (используем name вместо full_name, email_verified/phone_verified)
             if is_email:
-                cur.execute(f"SELECT id, phone, email, full_name, is_verified FROM {SCHEMA}.users WHERE email = %s", (normalized_contact,))
+                cur.execute(f"SELECT id, phone, email, name, email_verified, role FROM {SCHEMA}.users WHERE email = %s", (normalized_contact,))
             else:
-                cur.execute(f"SELECT id, phone, email, full_name, is_verified FROM {SCHEMA}.users WHERE phone = %s", (normalized_contact,))
+                cur.execute(f"SELECT id, phone, email, name, phone_verified, role FROM {SCHEMA}.users WHERE phone = %s", (normalized_contact,))
             
             user = cur.fetchone()
             print(f'[DEBUG] user found: {user is not None}')
             
             if not user:
-                # Создаем нового пользователя
-                print(f'[DEBUG] Creating new user')
+                # Создаем нового пользователя с ролью (password_hash = '', name = email/phone)
+                print(f'[DEBUG] Creating new user with role={role}')
                 if is_email:
                     cur.execute(f"""
-                        INSERT INTO {SCHEMA}.users (email, is_verified, last_login)
-                        VALUES (%s, TRUE, NOW())
-                        RETURNING id, phone, email, full_name, is_verified
-                    """, (normalized_contact,))
+                        INSERT INTO {SCHEMA}.users (email, email_verified, updated_at, role, password_hash, name)
+                        VALUES (%s, TRUE, NOW(), %s, '', %s)
+                        RETURNING id, phone, email, name, email_verified, role
+                    """, (normalized_contact, role, normalized_contact))
                 else:
                     cur.execute(f"""
-                        INSERT INTO {SCHEMA}.users (phone, is_verified, last_login)
-                        VALUES (%s, TRUE, NOW())
-                        RETURNING id, phone, email, full_name, is_verified
-                    """, (normalized_contact,))
+                        INSERT INTO {SCHEMA}.users (phone, phone_verified, updated_at, role, password_hash, name)
+                        VALUES (%s, TRUE, NOW(), %s, '', %s)
+                        RETURNING id, phone, email, name, phone_verified, role
+                    """, (normalized_contact, role, normalized_contact))
                 user = cur.fetchone()
                 print(f'[DEBUG] New user created: user_id={user["id"] if user else None}')
                 conn.commit()
             else:
-                # Обновляем last_login
+                # Обновляем updated_at и verified (роль не меняем для существующих)
                 print(f'[DEBUG] Updating existing user, user_id={user["id"]}')
-                cur.execute(f"UPDATE {SCHEMA}.users SET last_login = NOW(), is_verified = TRUE WHERE id = %s", (user['id'],))
+                if is_email:
+                    cur.execute(f"UPDATE {SCHEMA}.users SET updated_at = NOW(), email_verified = TRUE WHERE id = %s", (user['id'],))
+                else:
+                    cur.execute(f"UPDATE {SCHEMA}.users SET updated_at = NOW(), phone_verified = TRUE WHERE id = %s", (user['id'],))
                 conn.commit()
             
             # Создаем сессию
@@ -374,6 +453,9 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             print(f'[DEBUG] Session created successfully')
             conn.close()
             
+            # Поле is_verified зависит от типа контакта
+            is_verified = user.get('email_verified', False) if is_email else user.get('phone_verified', False)
+            
             return {
                 'statusCode': 200,
                 'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
@@ -381,11 +463,12 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                     'success': True,
                     'token': token,
                     'user': {
-                        'id': user['id'],
+                        'id': str(user['id']),  # UUID to string
                         'phone': user.get('phone'),
                         'email': user.get('email'),
-                        'full_name': user.get('full_name'),
-                        'is_verified': user.get('is_verified', False)
+                        'full_name': user.get('name'),
+                        'is_verified': is_verified,
+                        'role': user.get('role', 'seeker')
                     }
                 }),
                 'isBase64Encoded': False
@@ -429,11 +512,12 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 'body': json.dumps({
                     'valid': True,
                     'user': {
-                        'id': result['id'],
+                        'id': str(result['id']),  # UUID to string
                         'phone': result['phone'],
                         'email': result['email'],
-                        'full_name': result['full_name'],
-                        'is_verified': result['is_verified']
+                        'full_name': result['name'],
+                        'is_verified': True,
+                        'role': result.get('role', 'seeker')
                     }
                 }),
                 'isBase64Encoded': False

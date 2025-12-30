@@ -33,7 +33,7 @@ export function RegisterForm({ onSuccess, onSwitchToLogin, role }: RegisterFormP
       const res = await fetch('https://functions.poehali.dev/b3919417-c4e8-496a-982f-500d5754d530?path=send-code', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ contact })
+        body: JSON.stringify({ contact, role })
       });
 
       const data = await res.json();
@@ -73,7 +73,7 @@ export function RegisterForm({ onSuccess, onSwitchToLogin, role }: RegisterFormP
       const res = await fetch('https://functions.poehali.dev/b3919417-c4e8-496a-982f-500d5754d530?path=verify-code', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ contact, code })
+        body: JSON.stringify({ contact, code, role })
       });
 
       const data = await res.json();

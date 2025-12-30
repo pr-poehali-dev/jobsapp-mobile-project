@@ -29,15 +29,17 @@ export function AuthSystem({ open, onClose, onSuccess }: AuthSystemProps) {
   const [selectedRole, setSelectedRole] = useState<UserRole | null>(null);
 
   const handleAuthSuccess = (token: string, user: User) => {
+    // Используем роль из backend (если есть) или выбранную при регистрации
+    const finalRole = user.role || selectedRole || 'seeker';
     localStorage.setItem('auth_token', token);
-    localStorage.setItem('user', JSON.stringify({ ...user, role: selectedRole }));
+    localStorage.setItem('user', JSON.stringify({ ...user, role: finalRole }));
     
     toast({
       title: 'Вход выполнен',
       description: `Добро пожаловать${user.full_name ? ', ' + user.full_name : ''}!`
     });
     
-    onSuccess({ ...user, role: selectedRole || 'seeker' });
+    onSuccess({ ...user, role: finalRole });
     onClose();
   };
 

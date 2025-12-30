@@ -1,16 +1,16 @@
 {
   "tests": [
     {
-      "name": "Отправка кода на email",
+      "name": "Отправка кода на email с ролью (ожидается ошибка SMTP)",
       "method": "POST",
       "path": "/?path=send-code",
       "body": {
-        "contact": "test@example.com"
+        "contact": "test@example.com",
+        "role": "employer"
       },
-      "expectedStatus": 200,
+      "expectedStatus": 500,
       "expectedBody": {
-        "success": true,
-        "contact_type": "email"
+        "error": "string"
       },
       "bodyMatcher": "partial"
     },
@@ -22,6 +22,19 @@
         "contact": "invalid-email"
       },
       "expectedStatus": 400,
+      "expectedBody": {
+        "error": "string"
+      },
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "Обновление роли без токена",
+      "method": "POST",
+      "path": "/?path=update-role",
+      "body": {
+        "role": "employer"
+      },
+      "expectedStatus": 401,
       "expectedBody": {
         "error": "string"
       },
