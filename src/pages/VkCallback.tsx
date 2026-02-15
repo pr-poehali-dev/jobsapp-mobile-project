@@ -33,11 +33,26 @@ export default function VkCallback() {
   }, [handleCallback]);
 
   useEffect(() => {
-    if (isAuthenticated && accessToken) {
+    if (isAuthenticated && accessToken && user) {
       localStorage.setItem('auth_token', accessToken);
+      const currentUser = {
+        id: user.id,
+        email: user.email,
+        phone: null,
+        full_name: user.name,
+        name: user.name,
+        is_verified: true,
+        role: 'seeker',
+        balance: 0,
+        tier: 'FREE',
+        vacanciesThisMonth: 0,
+        avatar_url: user.avatar_url,
+        vk_id: user.vk_id,
+      };
+      localStorage.setItem('currentUser', JSON.stringify(currentUser));
       toast({
         title: 'Вход выполнен',
-        description: `Добро пожаловать${user?.name ? ', ' + user.name : ''}!`,
+        description: `Добро пожаловать${user.name ? ', ' + user.name : ''}!`,
       });
       navigate('/', { replace: true });
     }
