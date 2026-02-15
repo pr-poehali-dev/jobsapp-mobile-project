@@ -66,6 +66,18 @@ type Stats = {
   tier_distribution: Array<{ tier: string; count: number }>;
 };
 
+type PromoCode = {
+  id: string;
+  code: string;
+  bonus_balance: number;
+  bonus_vacancies: number;
+  max_activations: number;
+  current_activations: number;
+  is_active: boolean;
+  expires_at: string | null;
+  created_at: string;
+};
+
 export default function Admin() {
   const navigate = useNavigate();
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -90,6 +102,10 @@ export default function Admin() {
   const [mockVacancySearchQuery, setMockVacancySearchQuery] = useState('');
   const [showDeleteVacancyDialog, setShowDeleteVacancyDialog] = useState(false);
   const [vacancyToDelete, setVacancyToDelete] = useState<any | null>(null);
+  const [promoCodes, setPromoCodes] = useState<PromoCode[]>([]);
+  const [promoLoading, setPromoLoading] = useState(false);
+  const [showCreatePromoDialog, setShowCreatePromoDialog] = useState(false);
+  const [newPromo, setNewPromo] = useState({ code: '', bonus_balance: '', bonus_vacancies: '', max_activations: '1' });
 
   useEffect(() => {
     checkAuth();
@@ -403,6 +419,84 @@ export default function Admin() {
     }
   };
 
+  const loadPromoCodes = async () => {
+    setPromoLoading(true);
+    try {
+      const response = await fetch(`${ADMIN_API}?path=promo-codes`);
+      const data = await response.json();
+      if (data.success) {
+        setPromoCodes(data.promo_codes);
+      }
+    } catch (error) {
+      toast({
+        title: 'Ошибка',
+        description: 'Не удалось загрузить промо-коды',
+        variant: 'destructive'
+      });
+    } finally {
+      setPromoLoading(false);
+    }
+  };
+
+  const createPromoCode = async () => {
+    try {
+      const response = await fetch(`${ADMIN_API}?path=promo-codes`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          code: newPromo.code,
+          bonus_balance: parseFloat(newPromo.bonus_balance) || 0,
+          bonus_vacancies: parseInt(newPromo.bonus_vacancies) || 0,
+          max_activations: parseInt(newPromo.max_activations) || 1
+        })
+      });
+      const data = await response.json();
+      if (data.success) {
+        toast({
+          title: 'Успешно',
+          description: 'Промо-код создан'
+        });
+        loadPromoCodes();
+        setShowCreatePromoDialog(false);
+        setNewPromo({ code: '', bonus_balance: '', bonus_vacancies: '', max_activations: '1' });
+      } else {
+        throw new Error(data.error);
+      }
+    } catch (error: any) {
+      toast({
+        title: 'Ошибка',
+        description: error.message || 'Не удалось создать промо-код',
+        variant: 'destructive'
+      });
+    }
+  };
+
+  const deactivatePromoCode = async (id: string) => {
+    try {
+      const response = await fetch(`${ADMIN_API}?path=promo-codes`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id })
+      });
+      const data = await response.json();
+      if (data.success) {
+        toast({
+          title: 'Успешно',
+          description: 'Промо-код деактивирован'
+        });
+        loadPromoCodes();
+      } else {
+        throw new Error(data.error);
+      }
+    } catch (error: any) {
+      toast({
+        title: 'Ошибка',
+        description: error.message || 'Не удалось деактивировать промо-код',
+        variant: 'destructive'
+      });
+    }
+  };
+
   if (isCheckingAuth) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -500,12 +594,14 @@ export default function Admin() {
           if (value === 'all-vacancies') loadVacancies('published');
           if (value === 'users') loadUsers();
           if (value === 'stats') loadStats();
+          if (value === 'promo-codes') loadPromoCodes();
         }}>
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="moderation">Модерация</TabsTrigger>
             <TabsTrigger value="users">Пользователи</TabsTrigger>
             <TabsTrigger value="all-vacancies">Все объявления</TabsTrigger>
             <TabsTrigger value="stats">Статистика</TabsTrigger>
+            <TabsTrigger value="promo-codes">Промо-коды</TabsTrigger>
           </TabsList>
 
           <TabsContent value="moderation" className="space-y-4">
@@ -870,6 +966,88 @@ export default function Admin() {
               </Card>
             </div>
           </TabsContent>
+
+          <TabsContent value="promo-codes" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle>Промо-коды</CardTitle>
+                    <CardDescription>Управление промо-кодами для пользователей</CardDescription>
+                  </div>
+                  <Button size="sm" onClick={() => setShowCreatePromoDialog(true)}>
+                    <Icon name="Plus" size={16} className="mr-2" />
+                    Создать
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {promoLoading ? (
+                  <div className="text-center py-8">
+                    <Icon name="Loader2" size={32} className="animate-spin mx-auto" />
+                  </div>
+                ) : promoCodes.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <Icon name="Ticket" size={48} className="mx-auto mb-2 opacity-50" />
+                    <p>Промо-коды не созданы</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {promoCodes.map((promo) => (
+                      <Card key={promo.id} className={`hover:shadow-md transition-shadow ${!promo.is_active ? 'opacity-50' : ''}`}>
+                        <CardContent className="p-4">
+                          <div className="flex items-center justify-between">
+                            <div className="space-y-1">
+                              <div className="flex items-center gap-2">
+                                <span className="font-mono font-bold text-lg">{promo.code}</span>
+                                {promo.is_active ? (
+                                  <Badge className="bg-green-100 text-green-800">Активен</Badge>
+                                ) : (
+                                  <Badge variant="secondary">Неактивен</Badge>
+                                )}
+                              </div>
+                              <div className="flex gap-3 text-sm text-muted-foreground">
+                                {promo.bonus_balance > 0 && (
+                                  <span className="flex items-center gap-1">
+                                    <Icon name="Wallet" size={14} />
+                                    +{promo.bonus_balance} ₽
+                                  </span>
+                                )}
+                                {promo.bonus_vacancies > 0 && (
+                                  <span className="flex items-center gap-1">
+                                    <Icon name="Briefcase" size={14} />
+                                    +{promo.bonus_vacancies} вакансий
+                                  </span>
+                                )}
+                                <span>
+                                  Активаций: {promo.current_activations}/{promo.max_activations}
+                                </span>
+                              </div>
+                              <p className="text-xs text-muted-foreground">
+                                Создан: {new Date(promo.created_at).toLocaleDateString('ru-RU')}
+                                {promo.expires_at && ` • До: ${new Date(promo.expires_at).toLocaleDateString('ru-RU')}`}
+                              </p>
+                            </div>
+                            {promo.is_active && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="text-destructive border-destructive hover:bg-destructive/10"
+                                onClick={() => deactivatePromoCode(promo.id)}
+                              >
+                                <Icon name="Ban" size={14} className="mr-1" />
+                                Деактивировать
+                              </Button>
+                            )}
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
         </Tabs>
       </div>
 
@@ -1104,6 +1282,65 @@ export default function Admin() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Диалог создания промо-кода */}
+      <Dialog open={showCreatePromoDialog} onOpenChange={setShowCreatePromoDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Создать промо-код</DialogTitle>
+            <DialogDescription>Укажите параметры нового промо-кода</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label>Промо-код</Label>
+              <Input
+                value={newPromo.code}
+                onChange={(e) => setNewPromo({...newPromo, code: e.target.value.toUpperCase()})}
+                placeholder="BONUS500"
+                className="mt-1 font-mono"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label>Бонус баланса (₽)</Label>
+                <Input
+                  type="number"
+                  min="0"
+                  value={newPromo.bonus_balance}
+                  onChange={(e) => setNewPromo({...newPromo, bonus_balance: e.target.value})}
+                  placeholder="0"
+                  className="mt-1"
+                />
+              </div>
+              <div>
+                <Label>Бонус вакансий</Label>
+                <Input
+                  type="number"
+                  min="0"
+                  value={newPromo.bonus_vacancies}
+                  onChange={(e) => setNewPromo({...newPromo, bonus_vacancies: e.target.value})}
+                  placeholder="0"
+                  className="mt-1"
+                />
+              </div>
+            </div>
+            <div>
+              <Label>Макс. активаций</Label>
+              <Input
+                type="number"
+                min="1"
+                value={newPromo.max_activations}
+                onChange={(e) => setNewPromo({...newPromo, max_activations: e.target.value})}
+                className="mt-1"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowCreatePromoDialog(false)}>Отмена</Button>
+            <Button onClick={createPromoCode}>Создать</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

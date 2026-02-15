@@ -7,18 +7,22 @@ import { toast } from '@/hooks/use-toast';
 import Icon from '@/components/ui/icon';
 
 const PAYMENTS_API_URL = 'https://functions.poehali.dev/fc60f54b-d835-4f8b-9424-5d6c14a11945';
+const ADMIN_API = 'https://functions.poehali.dev/0d65638b-a8d6-40af-971b-31d0f9e356d0';
 
 interface BalanceTopUpProps {
   open: boolean;
   onClose: () => void;
   userId: string;
   currentBalance: number;
-  onSuccess?: () => void;
+  onSuccess?: (newBalance?: number) => void;
 }
 
 export function BalanceTopUp({ open, onClose, userId, currentBalance, onSuccess }: BalanceTopUpProps) {
   const [amount, setAmount] = useState<string>('500');
   const [loading, setLoading] = useState(false);
+  const [promoCode, setPromoCode] = useState('');
+  const [promoLoading, setPromoLoading] = useState(false);
+  const [promoResult, setPromoResult] = useState<{ success: boolean; message: string } | null>(null);
 
   const presetAmounts = [500, 1000, 2000, 5000];
 
@@ -50,7 +54,6 @@ export function BalanceTopUp({ open, onClose, userId, currentBalance, onSuccess 
       const data = await response.json();
 
       if (response.ok && data.success) {
-        // Открываем платежную страницу
         window.open(data.payment_url, '_blank');
         
         toast({
@@ -67,7 +70,7 @@ export function BalanceTopUp({ open, onClose, userId, currentBalance, onSuccess 
           variant: 'destructive'
         });
       }
-    } catch (error) {
+    } catch {
       toast({
         title: 'Ошибка',
         description: 'Не удалось подключиться к серверу',
@@ -75,6 +78,35 @@ export function BalanceTopUp({ open, onClose, userId, currentBalance, onSuccess 
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleActivatePromo = async () => {
+    if (!promoCode.trim()) return;
+
+    setPromoLoading(true);
+    setPromoResult(null);
+    try {
+      const response = await fetch(`${ADMIN_API}?path=activate-promo`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: promoCode.trim(), user_id: userId })
+      });
+
+      const data = await response.json();
+
+      if (response.ok && data.success) {
+        setPromoResult({ success: true, message: data.message });
+        setPromoCode('');
+        toast({ title: 'Промо-код активирован', description: data.message });
+        onSuccess?.(data.new_balance);
+      } else {
+        setPromoResult({ success: false, message: data.error || 'Ошибка активации' });
+      }
+    } catch {
+      setPromoResult({ success: false, message: 'Не удалось подключиться к серверу' });
+    } finally {
+      setPromoLoading(false);
     }
   };
 
@@ -89,7 +121,47 @@ export function BalanceTopUp({ open, onClose, userId, currentBalance, onSuccess 
         </DialogHeader>
 
         <div className="space-y-6 py-4">
-          {/* Быстрый выбор суммы */}
+          <div className="space-y-3 rounded-lg border bg-muted/30 p-4">
+            <Label className="flex items-center gap-2">
+              <Icon name="Ticket" size={16} />
+              Промо-код
+            </Label>
+            <div className="flex gap-2">
+              <Input
+                value={promoCode}
+                onChange={(e) => {
+                  setPromoCode(e.target.value.toUpperCase());
+                  setPromoResult(null);
+                }}
+                placeholder="Введите промо-код"
+                className="font-mono"
+                onKeyDown={(e) => e.key === 'Enter' && handleActivatePromo()}
+              />
+              <Button
+                onClick={handleActivatePromo}
+                disabled={promoLoading || !promoCode.trim()}
+                size="default"
+              >
+                {promoLoading ? (
+                  <Icon name="Loader2" className="animate-spin" size={16} />
+                ) : (
+                  'Применить'
+                )}
+              </Button>
+            </div>
+            {promoResult && (
+              <p className={`text-sm ${promoResult.success ? 'text-green-600' : 'text-destructive'}`}>
+                {promoResult.message}
+              </p>
+            )}
+          </div>
+
+          <div className="relative flex items-center">
+            <div className="flex-1 border-t" />
+            <span className="px-3 text-xs text-muted-foreground">или пополните через оплату</span>
+            <div className="flex-1 border-t" />
+          </div>
+
           <div className="space-y-3">
             <Label>Быстрый выбор</Label>
             <div className="grid grid-cols-4 gap-2">
@@ -106,7 +178,6 @@ export function BalanceTopUp({ open, onClose, userId, currentBalance, onSuccess 
             </div>
           </div>
 
-          {/* Своя сумма */}
           <div className="space-y-2">
             <Label htmlFor="amount">Или укажите свою сумму</Label>
             <div className="relative">
@@ -128,7 +199,6 @@ export function BalanceTopUp({ open, onClose, userId, currentBalance, onSuccess 
             </p>
           </div>
 
-          {/* Итого */}
           <div className="rounded-lg border bg-muted/50 p-4 space-y-2">
             <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">Текущий баланс:</span>
@@ -146,7 +216,6 @@ export function BalanceTopUp({ open, onClose, userId, currentBalance, onSuccess 
             </div>
           </div>
 
-          {/* Кнопки */}
           <div className="flex gap-3">
             <Button
               variant="outline"
@@ -175,7 +244,6 @@ export function BalanceTopUp({ open, onClose, userId, currentBalance, onSuccess 
             </Button>
           </div>
 
-          {/* Информация о Pally */}
           <div className="text-xs text-center text-muted-foreground">
             <Icon name="ShieldCheck" size={14} className="inline mr-1" />
             Безопасная оплата через Pally

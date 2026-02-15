@@ -21,6 +21,39 @@
         "success": false
       },
       "bodyMatcher": "partial"
+    },
+    {
+      "name": "Get promo codes list",
+      "method": "GET",
+      "path": "/?path=promo-codes",
+      "expectedStatus": 200,
+      "expectedBody": {
+        "success": true,
+        "promo_codes": []
+      },
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "Create promo code - missing code",
+      "method": "POST",
+      "path": "/?path=promo-codes",
+      "body": {"bonus_balance": 100},
+      "expectedStatus": 400,
+      "expectedBody": {
+        "success": false
+      },
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "Activate promo - missing fields",
+      "method": "POST",
+      "path": "/?path=activate-promo",
+      "body": {},
+      "expectedStatus": 400,
+      "expectedBody": {
+        "success": false
+      },
+      "bodyMatcher": "partial"
     }
   ]
 }

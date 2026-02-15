@@ -1,6 +1,6 @@
 """
-Единый API для управления: пользователи, вакансии, модерация, статистика
-Роуты: ?path=users, vacancies, moderate, stats, update-balance
+Единый API для управления: пользователи, вакансии, модерация, статистика, промо-коды
+Роуты: ?path=users, vacancies, moderate, stats, update-balance, promo-codes, activate-promo
 """
 import json
 import os
@@ -53,6 +53,15 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             return get_stats(conn)
         elif path == 'update-balance':
             return update_user_balance(event, conn, context)
+        elif path == 'promo-codes':
+            if method == 'GET':
+                return get_promo_codes(conn)
+            elif method == 'POST':
+                return create_promo_code(event, conn)
+            elif method == 'DELETE':
+                return delete_promo_code(event, conn)
+        elif path == 'activate-promo':
+            return activate_promo_code(event, conn)
         else:
             return error_response(404, 'Path not found')
     finally:
@@ -598,6 +607,183 @@ def update_user_balance(event: Dict[str, Any], conn, context: Any) -> Dict[str, 
                 'success': True,
                 'user': dict(user),
                 'message': f"Баланс изменен на {amount} ₽"
+            }, default=str),
+            'isBase64Encoded': False
+        }
+
+
+def get_promo_codes(conn) -> Dict[str, Any]:
+    """Список всех промо-кодов"""
+    with conn.cursor(cursor_factory=RealDictCursor) as cur:
+        cur.execute("""
+            SELECT * FROM promo_codes 
+            ORDER BY created_at DESC
+        """)
+        codes = cur.fetchall()
+        return {
+            'statusCode': 200,
+            'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
+            'body': json.dumps({
+                'success': True,
+                'promo_codes': [dict(c) for c in codes]
+            }, default=str),
+            'isBase64Encoded': False
+        }
+
+
+def create_promo_code(event: Dict[str, Any], conn) -> Dict[str, Any]:
+    """Создание промо-кода администратором"""
+    body = json.loads(event.get('body', '{}') or '{}')
+    code = (body.get('code') or '').strip().upper()
+    bonus_balance = float(body.get('bonus_balance', 0))
+    bonus_vacancies = int(body.get('bonus_vacancies', 0))
+    max_activations = int(body.get('max_activations', 1))
+    expires_at = body.get('expires_at')
+
+    if not code:
+        return error_response(400, 'Код не указан')
+    if bonus_balance <= 0 and bonus_vacancies <= 0:
+        return error_response(400, 'Укажите бонус баланса или вакансий')
+
+    with conn.cursor(cursor_factory=RealDictCursor) as cur:
+        cur.execute("SELECT id FROM promo_codes WHERE code = %s", (code,))
+        if cur.fetchone():
+            return error_response(400, 'Промо-код с таким именем уже существует')
+
+        cur.execute("""
+            INSERT INTO promo_codes (code, bonus_balance, bonus_vacancies, max_activations, expires_at)
+            VALUES (%s, %s, %s, %s, %s)
+            RETURNING *
+        """, (code, bonus_balance, bonus_vacancies, max_activations, expires_at))
+        conn.commit()
+        promo = cur.fetchone()
+
+        return {
+            'statusCode': 200,
+            'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
+            'body': json.dumps({
+                'success': True,
+                'promo_code': dict(promo)
+            }, default=str),
+            'isBase64Encoded': False
+        }
+
+
+def delete_promo_code(event: Dict[str, Any], conn) -> Dict[str, Any]:
+    """Удаление / деактивация промо-кода"""
+    body = json.loads(event.get('body', '{}') or '{}')
+    promo_id = body.get('id')
+    if not promo_id:
+        return error_response(400, 'id required')
+
+    with conn.cursor(cursor_factory=RealDictCursor) as cur:
+        cur.execute("""
+            UPDATE promo_codes SET is_active = false WHERE id = %s RETURNING *
+        """, (promo_id,))
+        conn.commit()
+        promo = cur.fetchone()
+        if not promo:
+            return error_response(404, 'Промо-код не найден')
+
+        return {
+            'statusCode': 200,
+            'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
+            'body': json.dumps({'success': True, 'message': 'Промо-код деактивирован'}, default=str),
+            'isBase64Encoded': False
+        }
+
+
+def activate_promo_code(event: Dict[str, Any], conn) -> Dict[str, Any]:
+    """Активация промо-кода пользователем"""
+    if event.get('httpMethod') != 'POST':
+        return error_response(405, 'Method not allowed')
+
+    body = json.loads(event.get('body', '{}') or '{}')
+    code = (body.get('code') or '').strip().upper()
+    user_id = body.get('user_id')
+
+    if not code or not user_id:
+        return error_response(400, 'code и user_id обязательны')
+
+    with conn.cursor(cursor_factory=RealDictCursor) as cur:
+        cur.execute("SELECT * FROM promo_codes WHERE code = %s", (code,))
+        promo = cur.fetchone()
+
+        if not promo:
+            return error_response(404, 'Промо-код не найден')
+        if not promo['is_active']:
+            return error_response(400, 'Промо-код неактивен')
+        if promo['current_activations'] >= promo['max_activations']:
+            return error_response(400, 'Промо-код исчерпан')
+
+        from datetime import datetime
+        if promo['expires_at'] and promo['expires_at'] < datetime.now():
+            return error_response(400, 'Срок действия промо-кода истёк')
+
+        cur.execute(
+            "SELECT id FROM promo_activations WHERE promo_code_id = %s AND user_id = %s",
+            (promo['id'], user_id)
+        )
+        if cur.fetchone():
+            return error_response(400, 'Вы уже активировали этот промо-код')
+
+        bonus_balance = float(promo['bonus_balance'])
+        bonus_vacancies = int(promo['bonus_vacancies'])
+
+        if bonus_balance > 0:
+            cur.execute(
+                "UPDATE users SET balance = balance + %s WHERE id = %s",
+                (bonus_balance, user_id)
+            )
+
+        if bonus_vacancies > 0:
+            cur.execute(
+                "UPDATE users SET vacancies_this_month = vacancies_this_month + %s WHERE id = %s",
+                (bonus_vacancies, user_id)
+            )
+
+        cur.execute(
+            "UPDATE promo_codes SET current_activations = current_activations + 1 WHERE id = %s",
+            (promo['id'],)
+        )
+
+        cur.execute(
+            "INSERT INTO promo_activations (promo_code_id, user_id) VALUES (%s, %s)",
+            (promo['id'], user_id)
+        )
+
+        if bonus_balance > 0:
+            cur.execute("""
+                INSERT INTO transactions (id, user_id, amount, type, description)
+                VALUES (%s, %s, %s, 'deposit', %s)
+            """, (
+                f"promo_{promo['id']}_{user_id}",
+                user_id,
+                bonus_balance,
+                f"Промо-код {code}"
+            ))
+
+        conn.commit()
+
+        cur.execute("SELECT balance, vacancies_this_month FROM users WHERE id = %s", (user_id,))
+        user = cur.fetchone()
+
+        bonuses = []
+        if bonus_balance > 0:
+            bonuses.append(f"+{int(bonus_balance)} ₽ на баланс")
+        if bonus_vacancies > 0:
+            bonuses.append(f"+{bonus_vacancies} вакансий")
+
+        return {
+            'statusCode': 200,
+            'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
+            'body': json.dumps({
+                'success': True,
+                'message': f"Промо-код активирован: {', '.join(bonuses)}",
+                'bonus_balance': bonus_balance,
+                'bonus_vacancies': bonus_vacancies,
+                'new_balance': float(user['balance']) if user else 0,
+                'new_vacancies': int(user['vacancies_this_month']) if user else 0
             }, default=str),
             'isBase64Encoded': False
         }
