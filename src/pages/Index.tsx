@@ -922,6 +922,8 @@ export default function Index() {
         open={showBalanceDialog} 
         onClose={() => setShowBalanceDialog(false)} 
         userId={currentUser?.id || ''}
+        userName={currentUser?.name || ''}
+        userEmail={currentUser?.email || ''}
         currentBalance={currentUser?.balance || 0}
         onSuccess={(newBalance, newTier) => {
           if (currentUser) {

@@ -5,19 +5,22 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from '@/hooks/use-toast';
 import Icon from '@/components/ui/icon';
+import func2url from '@/../backend/func2url.json';
 
-const PAYMENTS_API_URL = 'https://functions.poehali.dev/fc60f54b-d835-4f8b-9424-5d6c14a11945';
 const ADMIN_API = 'https://functions.poehali.dev/0d65638b-a8d6-40af-971b-31d0f9e356d0';
+const ROBOKASSA_API = func2url['robokassa-robokassa'];
 
 interface BalanceTopUpProps {
   open: boolean;
   onClose: () => void;
   userId: string;
+  userName?: string;
+  userEmail?: string;
   currentBalance: number;
   onSuccess?: (newBalance?: number, newTier?: string) => void;
 }
 
-export function BalanceTopUp({ open, onClose, userId, currentBalance, onSuccess }: BalanceTopUpProps) {
+export function BalanceTopUp({ open, onClose, userId, userName, userEmail, currentBalance, onSuccess }: BalanceTopUpProps) {
   const [amount, setAmount] = useState<string>('500');
   const [loading, setLoading] = useState(false);
   const [promoCode, setPromoCode] = useState('');
@@ -40,24 +43,28 @@ export function BalanceTopUp({ open, onClose, userId, currentBalance, onSuccess 
 
     setLoading(true);
     try {
-      const response = await fetch(`${PAYMENTS_API_URL}?path=create-payment`, {
+      const response = await fetch(ROBOKASSA_API, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          user_id: userId,
           amount: numAmount,
-          payment_system: 'pally',
-          return_url: `${window.location.origin}/payment-success`
+          user_id: userId,
+          user_name: userName || 'Пользователь',
+          user_email: userEmail || 'noreply@example.com',
+          order_comment: 'Пополнение баланса',
+          cart_items: [],
+          success_url: `${window.location.origin}?payment=success`,
+          fail_url: `${window.location.origin}?payment=fail`
         })
       });
 
       const data = await response.json();
 
-      if (response.ok && data.success) {
+      if (response.ok && data.payment_url) {
         window.open(data.payment_url, '_blank');
         
         toast({
-          title: 'Платеж создан',
+          title: 'Платёж создан',
           description: 'Откройте новую вкладку для оплаты. После оплаты баланс обновится автоматически.',
         });
 
@@ -66,7 +73,7 @@ export function BalanceTopUp({ open, onClose, userId, currentBalance, onSuccess 
       } else {
         toast({
           title: 'Ошибка',
-          description: data.error || 'Не удалось создать платеж',
+          description: data.error || 'Не удалось создать платёж',
           variant: 'destructive'
         });
       }
@@ -238,16 +245,15 @@ export function BalanceTopUp({ open, onClose, userId, currentBalance, onSuccess 
               ) : (
                 <>
                   <Icon name="CreditCard" className="mr-2" size={16} />
-                  Пополнить
+                  Оплатить {amount} ₽
                 </>
               )}
             </Button>
           </div>
 
-          <div className="text-xs text-center text-muted-foreground">
-            <Icon name="ShieldCheck" size={14} className="inline mr-1" />
-            Безопасная оплата через Pally
-          </div>
+          <p className="text-xs text-center text-muted-foreground">
+            Оплата через Robokassa. Поддерживаются банковские карты, СБП и другие способы.
+          </p>
         </div>
       </DialogContent>
     </Dialog>
