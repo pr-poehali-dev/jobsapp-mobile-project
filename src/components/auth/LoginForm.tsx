@@ -3,6 +3,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { PhoneInput } from '@/components/ui/phone-input';
 import { VkLoginButton } from '@/components/extensions/vk-auth/VkLoginButton';
+import { safeSessionStorage } from '@/lib/safe-storage';
 import { useState } from 'react';
 
 const VK_API_BASE = 'https://functions.poehali.dev/98c7ab8f-e10f-49ed-aa81-db6e7ee198d3';
@@ -33,10 +34,10 @@ export function LoginForm({ onSuccess, onSwitchToRegister }: LoginFormProps) {
         return;
       }
       if (data.state) {
-        sessionStorage.setItem('vk_auth_state', data.state);
+        safeSessionStorage.setItem('vk_auth_state', data.state);
       }
       if (data.code_verifier) {
-        sessionStorage.setItem('vk_auth_code_verifier', data.code_verifier);
+        safeSessionStorage.setItem('vk_auth_code_verifier', data.code_verifier);
       }
       window.location.href = data.auth_url;
     } catch {

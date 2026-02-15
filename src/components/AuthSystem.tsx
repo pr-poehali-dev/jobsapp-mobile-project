@@ -5,6 +5,7 @@ import { LoginForm } from './auth/LoginForm';
 import { RegisterForm } from './auth/RegisterForm';
 import { Button } from './ui/button';
 import Icon from './ui/icon';
+import safeStorage from '@/lib/safe-storage';
 
 type AuthMode = 'login' | 'register' | 'role-select';
 type UserRole = 'seeker' | 'employer';
@@ -31,7 +32,7 @@ export function AuthSystem({ open, onClose, onSuccess }: AuthSystemProps) {
   const handleAuthSuccess = (token: string, user: User) => {
     // Используем роль из backend (если есть) или выбранную при регистрации
     const finalRole = user.role || selectedRole || 'seeker';
-    localStorage.setItem('auth_token', token);
+    safeStorage.setItem('auth_token', token);
     
     // Дополняем пользователя обязательными полями для работодателя
     const fullUser = {

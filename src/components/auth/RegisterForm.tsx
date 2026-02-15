@@ -3,6 +3,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { PhoneInput } from '@/components/ui/phone-input';
+import { safeSessionStorage } from '@/lib/safe-storage';
 import { VkLoginButton } from '@/components/extensions/vk-auth/VkLoginButton';
 import { useState } from 'react';
 
@@ -35,10 +36,10 @@ export function RegisterForm({ onSuccess, onSwitchToLogin, role }: RegisterFormP
         return;
       }
       if (data.state) {
-        sessionStorage.setItem('vk_auth_state', data.state);
+        safeSessionStorage.setItem('vk_auth_state', data.state);
       }
       if (data.code_verifier) {
-        sessionStorage.setItem('vk_auth_code_verifier', data.code_verifier);
+        safeSessionStorage.setItem('vk_auth_code_verifier', data.code_verifier);
       }
       window.location.href = data.auth_url;
     } catch {

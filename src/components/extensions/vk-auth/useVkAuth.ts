@@ -52,49 +52,42 @@ interface UseVkAuthReturn {
 // LOCAL STORAGE
 // =============================================================================
 
+import safeStorage, { safeSessionStorage } from '@/lib/safe-storage';
+
 function getStoredRefreshToken(): string | null {
-  if (typeof window === "undefined") return null;
-  return localStorage.getItem(REFRESH_TOKEN_KEY);
+  return safeStorage.getItem(REFRESH_TOKEN_KEY);
 }
 
 function setStoredRefreshToken(token: string): void {
-  if (typeof window === "undefined") return;
-  localStorage.setItem(REFRESH_TOKEN_KEY, token);
+  safeStorage.setItem(REFRESH_TOKEN_KEY, token);
 }
 
 function clearStoredRefreshToken(): void {
-  if (typeof window === "undefined") return;
-  localStorage.removeItem(REFRESH_TOKEN_KEY);
+  safeStorage.removeItem(REFRESH_TOKEN_KEY);
 }
 
 function getStoredCodeVerifier(): string | null {
-  if (typeof window === "undefined") return null;
-  return sessionStorage.getItem(CODE_VERIFIER_KEY);
+  return safeSessionStorage.getItem(CODE_VERIFIER_KEY);
 }
 
 function setStoredCodeVerifier(verifier: string): void {
-  if (typeof window === "undefined") return;
-  sessionStorage.setItem(CODE_VERIFIER_KEY, verifier);
+  safeSessionStorage.setItem(CODE_VERIFIER_KEY, verifier);
 }
 
 function clearStoredCodeVerifier(): void {
-  if (typeof window === "undefined") return;
-  sessionStorage.removeItem(CODE_VERIFIER_KEY);
+  safeSessionStorage.removeItem(CODE_VERIFIER_KEY);
 }
 
 function setStoredState(state: string): void {
-  if (typeof window === "undefined") return;
-  sessionStorage.setItem(STATE_KEY, state);
+  safeSessionStorage.setItem(STATE_KEY, state);
 }
 
 function getStoredState(): string | null {
-  if (typeof window === "undefined") return null;
-  return sessionStorage.getItem(STATE_KEY);
+  return safeSessionStorage.getItem(STATE_KEY);
 }
 
 function clearStoredState(): void {
-  if (typeof window === "undefined") return;
-  sessionStorage.removeItem(STATE_KEY);
+  safeSessionStorage.removeItem(STATE_KEY);
 }
 
 // =============================================================================

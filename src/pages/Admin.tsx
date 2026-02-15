@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import safeStorage from '@/lib/safe-storage';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
@@ -123,7 +124,7 @@ export default function Admin() {
   };
 
   const checkAuth = () => {
-    const savedUser = localStorage.getItem('adminUser');
+    const savedUser = safeStorage.getItem('adminUser');
     if (savedUser) {
       const user = JSON.parse(savedUser);
       if (
@@ -133,7 +134,7 @@ export default function Admin() {
         setCurrentUser(user);
         setIsAuthenticated(true);
       } else {
-        localStorage.removeItem('adminUser');
+        safeStorage.removeItem('adminUser');
       }
     }
     setIsCheckingAuth(false);
@@ -160,7 +161,7 @@ export default function Admin() {
           (user.phone === '+79992255109' || user.email === 'ad.alex1995@yandex.ru') &&
           user.role === 'admin'
         ) {
-          localStorage.setItem('adminUser', JSON.stringify(user));
+          safeStorage.setItem('adminUser', JSON.stringify(user));
           setCurrentUser(user);
           setIsAuthenticated(true);
           toast({
@@ -193,7 +194,7 @@ export default function Admin() {
   };
 
   const handleLogout = () => {
-    localStorage.removeItem('adminUser');
+    safeStorage.removeItem('adminUser');
     setCurrentUser(null);
     setIsAuthenticated(false);
     navigate('/');

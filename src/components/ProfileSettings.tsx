@@ -3,6 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { toast } from '@/hooks/use-toast';
+import safeStorage from '@/lib/safe-storage';
 import Icon from '@/components/ui/icon';
 
 type UserRole = 'seeker' | 'employer';
@@ -42,7 +43,7 @@ export function ProfileSettings({ open, onClose, user, onUpdate }: ProfileSettin
 
     setLoading(true);
     try {
-      const token = localStorage.getItem('auth_token');
+      const token = safeStorage.getItem('auth_token');
       const isVkUser = !!(user as any).vk_id;
       const apiUrl = isVkUser
         ? 'https://functions.poehali.dev/98c7ab8f-e10f-49ed-aa81-db6e7ee198d3?action=update-role'
@@ -66,7 +67,7 @@ export function ProfileSettings({ open, onClose, user, onUpdate }: ProfileSettin
 
       const updatedUser = { ...user, role: selectedRole };
       onUpdate(updatedUser);
-      localStorage.setItem('currentUser', JSON.stringify(updatedUser));
+      safeStorage.setItem('currentUser', JSON.stringify(updatedUser));
 
       toast({
         title: 'Роль обновлена',

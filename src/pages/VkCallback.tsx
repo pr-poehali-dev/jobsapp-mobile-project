@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useVkAuth } from '@/components/extensions/vk-auth/useVkAuth';
 import { useToast } from '@/hooks/use-toast';
+import safeStorage from '@/lib/safe-storage';
 
 const VK_API_BASE = 'https://functions.poehali.dev/98c7ab8f-e10f-49ed-aa81-db6e7ee198d3';
 
@@ -34,7 +35,7 @@ export default function VkCallback() {
 
   useEffect(() => {
     if (isAuthenticated && accessToken && user) {
-      localStorage.setItem('auth_token', accessToken);
+      safeStorage.setItem('auth_token', accessToken);
       const currentUser = {
         id: user.id,
         email: user.email,
@@ -49,7 +50,7 @@ export default function VkCallback() {
         avatar_url: user.avatar_url,
         vk_id: user.vk_id,
       };
-      localStorage.setItem('currentUser', JSON.stringify(currentUser));
+      safeStorage.setItem('currentUser', JSON.stringify(currentUser));
       toast({
         title: 'Вход выполнен',
         description: `Добро пожаловать${user.name ? ', ' + user.name : ''}!`,

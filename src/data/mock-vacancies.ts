@@ -68,17 +68,18 @@ export const MOCK_VACANCIES: Vacancy[] = [
 ];
 
 // API для работы с моковыми вакансиями через localStorage
+import safeStorage from '@/lib/safe-storage';
+
 const STORAGE_KEY = 'mock_vacancies';
 
 export function getMockVacancies(): Vacancy[] {
-  const stored = localStorage.getItem(STORAGE_KEY);
+  const stored = safeStorage.getItem(STORAGE_KEY);
   if (stored) {
     try {
       const vacancies = JSON.parse(stored);
-      // Проверяем версию данных - если у первой вакансии нет новых полей, обновляем все
       if (vacancies.length > 0 && !('requirements' in vacancies[0])) {
         console.log('Updating mock vacancies to new format');
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(MOCK_VACANCIES));
+        safeStorage.setItem(STORAGE_KEY, JSON.stringify(MOCK_VACANCIES));
         return MOCK_VACANCIES;
       }
       return vacancies;
@@ -86,13 +87,12 @@ export function getMockVacancies(): Vacancy[] {
       console.error('Error parsing mock vacancies:', e);
     }
   }
-  // Если нет сохраненных данных, используем дефолтные
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(MOCK_VACANCIES));
+  safeStorage.setItem(STORAGE_KEY, JSON.stringify(MOCK_VACANCIES));
   return MOCK_VACANCIES;
 }
 
 export function saveMockVacancies(vacancies: Vacancy[]): void {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(vacancies));
+  safeStorage.setItem(STORAGE_KEY, JSON.stringify(vacancies));
 }
 
 export function deleteMockVacancy(id: string): void {

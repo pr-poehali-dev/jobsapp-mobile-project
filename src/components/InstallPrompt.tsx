@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import Icon from '@/components/ui/icon';
+import safeStorage from '@/lib/safe-storage';
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
@@ -22,7 +23,7 @@ export function InstallPrompt() {
     setIsIOS(ios);
     setIsStandalone(standalone);
 
-    const dismissed = localStorage.getItem('installPromptDismissed');
+    const dismissed = safeStorage.getItem('installPromptDismissed');
     const isMobile = window.innerWidth < 768;
 
     if (!dismissed && !standalone && isMobile) {
@@ -48,14 +49,14 @@ export function InstallPrompt() {
     
     if (outcome === 'accepted') {
       setShowPrompt(false);
-      localStorage.setItem('installPromptDismissed', 'true');
+      safeStorage.setItem('installPromptDismissed', 'true');
     }
     setDeferredPrompt(null);
   };
 
   const handleDismiss = () => {
     setShowPrompt(false);
-    localStorage.setItem('installPromptDismissed', 'true');
+    safeStorage.setItem('installPromptDismissed', 'true');
   };
 
   if (!showPrompt || isStandalone) return null;

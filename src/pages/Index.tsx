@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import Icon from '@/components/ui/icon';
+import safeStorage from '@/lib/safe-storage';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -146,14 +147,14 @@ export default function Index() {
 
   // Загрузка пользователя из localStorage при монтировании
   useEffect(() => {
-    const savedUser = localStorage.getItem('currentUser');
+    const savedUser = safeStorage.getItem('currentUser');
     if (savedUser) {
       try {
         const user = JSON.parse(savedUser);
         setCurrentUser(user);
       } catch (error) {
         console.error('Ошибка загрузки пользователя:', error);
-        localStorage.removeItem('currentUser');
+        safeStorage.removeItem('currentUser');
       }
     }
   }, []);
@@ -161,15 +162,15 @@ export default function Index() {
   // Сохранение пользователя в localStorage при изменении
   useEffect(() => {
     if (currentUser) {
-      localStorage.setItem('currentUser', JSON.stringify(currentUser));
+      safeStorage.setItem('currentUser', JSON.stringify(currentUser));
     } else {
-      localStorage.removeItem('currentUser');
+      safeStorage.removeItem('currentUser');
     }
   }, [currentUser]);
 
   // Загрузка сохраненного города из localStorage
   useEffect(() => {
-    const savedCity = localStorage.getItem('selectedCity');
+    const savedCity = safeStorage.getItem('selectedCity');
     if (savedCity) {
       setSelectedCity(savedCity);
     }
@@ -178,9 +179,9 @@ export default function Index() {
   // Сохранение выбранного города в localStorage
   useEffect(() => {
     if (selectedCity) {
-      localStorage.setItem('selectedCity', selectedCity);
+      safeStorage.setItem('selectedCity', selectedCity);
     } else {
-      localStorage.removeItem('selectedCity');
+      safeStorage.removeItem('selectedCity');
     }
   }, [selectedCity]);
 
