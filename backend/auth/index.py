@@ -523,6 +523,62 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 'isBase64Encoded': False
             }
         
+        elif path == 'login' and method == 'POST':
+            login_value = body.get('login', '').strip()
+            password = body.get('password', '')
+            
+            admin_password = os.environ.get('ADMIN_PASSWORD', '')
+            if not admin_password or password != admin_password:
+                conn.close()
+                return {
+                    'statusCode': 401,
+                    'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
+                    'body': json.dumps({'error': 'Неверный логин или пароль'}),
+                    'isBase64Encoded': False
+                }
+            
+            is_email = '@' in login_value
+            if is_email:
+                cur.execute(f"SELECT id, phone, email, name, email_verified, role FROM {SCHEMA}.users WHERE email = %s AND role = 'admin'", (login_value.lower(),))
+            else:
+                normalized = normalize_phone(login_value)
+                cur.execute(f"SELECT id, phone, email, name, phone_verified, role FROM {SCHEMA}.users WHERE phone = %s AND role = 'admin'", (normalized,))
+            
+            user = cur.fetchone()
+            
+            if not user:
+                conn.close()
+                return {
+                    'statusCode': 401,
+                    'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
+                    'body': json.dumps({'error': 'Администратор не найден'}),
+                    'isBase64Encoded': False
+                }
+            
+            token = generate_token()
+            expires_at = datetime.now() + timedelta(days=30)
+            cur.execute(f"INSERT INTO {SCHEMA}.sessions (user_id, token, expires_at) VALUES (%s, %s, %s)", (user['id'], token, expires_at))
+            conn.commit()
+            conn.close()
+            
+            return {
+                'statusCode': 200,
+                'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
+                'body': json.dumps({
+                    'success': True,
+                    'token': token,
+                    'user': {
+                        'id': str(user['id']),
+                        'phone': user.get('phone'),
+                        'email': user.get('email'),
+                        'full_name': user.get('name'),
+                        'is_verified': True,
+                        'role': user.get('role', 'admin')
+                    }
+                }),
+                'isBase64Encoded': False
+            }
+        
         else:
             conn.close()
             return {
