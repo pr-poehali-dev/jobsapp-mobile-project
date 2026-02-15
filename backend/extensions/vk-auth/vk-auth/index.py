@@ -406,16 +406,20 @@ def handle_callback(event: dict, origin: str) -> dict:
                 }
             }, origin)
 
-        except Exception:
+        except Exception as e:
             conn.rollback()
-            return error(500, 'Database error', origin)
+            import traceback
+            traceback.print_exc()
+            return error(500, f'Database error: {str(e)}', origin)
         finally:
             conn.close()
 
-    except HTTPError:
-        return error(500, 'VK API error', origin)
-    except Exception:
-        return error(500, 'Internal server error', origin)
+    except HTTPError as e:
+        return error(500, f'VK API error: {str(e)}', origin)
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return error(500, f'Internal error: {str(e)}', origin)
 
 
 def handle_refresh(event: dict, origin: str) -> dict:
