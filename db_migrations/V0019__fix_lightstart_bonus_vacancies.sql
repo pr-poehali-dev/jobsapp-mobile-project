@@ -1,0 +1,1 @@
+UPDATE promo_codes SET bonus_vacancies = 1 WHERE code = 'LIGHTSTART';

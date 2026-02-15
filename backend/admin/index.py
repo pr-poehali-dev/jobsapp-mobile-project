@@ -732,17 +732,21 @@ def activate_promo_code(event: Dict[str, Any], conn) -> Dict[str, Any]:
         bonus_balance = float(promo['bonus_balance'])
         bonus_vacancies = int(promo['bonus_vacancies'])
 
+        cur.execute("SELECT tier FROM users WHERE id = %s", (user_id,))
+        current_user = cur.fetchone()
+
         if bonus_balance > 0:
             cur.execute(
                 "UPDATE users SET balance = balance + %s WHERE id = %s",
                 (bonus_balance, user_id)
             )
 
-        if bonus_vacancies > 0:
-            cur.execute(
-                "UPDATE users SET vacancies_this_month = vacancies_this_month + %s WHERE id = %s",
-                (bonus_vacancies, user_id)
-            )
+        if bonus_vacancies > 0 or bonus_balance > 0:
+            if current_user and current_user['tier'] == 'FREE':
+                cur.execute(
+                    "UPDATE users SET tier = 'ECONOM' WHERE id = %s",
+                    (user_id,)
+                )
 
         cur.execute(
             "UPDATE promo_codes SET current_activations = current_activations + 1 WHERE id = %s",
@@ -766,14 +770,16 @@ def activate_promo_code(event: Dict[str, Any], conn) -> Dict[str, Any]:
 
         conn.commit()
 
-        cur.execute("SELECT balance, vacancies_this_month FROM users WHERE id = %s", (user_id,))
+        cur.execute("SELECT balance, vacancies_this_month, tier FROM users WHERE id = %s", (user_id,))
         user = cur.fetchone()
 
         bonuses = []
         if bonus_balance > 0:
             bonuses.append(f"+{int(bonus_balance)} ₽ на баланс")
+        if current_user and current_user['tier'] == 'FREE' and user and user['tier'] != 'FREE':
+            bonuses.append(f"тариф {user['tier']}")
         if bonus_vacancies > 0:
-            bonuses.append(f"+{bonus_vacancies} вакансий")
+            bonuses.append(f"+{bonus_vacancies} бесплатных вакансий")
 
         return {
             'statusCode': 200,
@@ -784,7 +790,8 @@ def activate_promo_code(event: Dict[str, Any], conn) -> Dict[str, Any]:
                 'bonus_balance': bonus_balance,
                 'bonus_vacancies': bonus_vacancies,
                 'new_balance': float(user['balance']) if user else 0,
-                'new_vacancies': int(user['vacancies_this_month']) if user else 0
+                'new_vacancies': int(user['vacancies_this_month']) if user else 0,
+                'new_tier': user['tier'] if user else 'FREE'
             }, default=str),
             'isBase64Encoded': False
         }

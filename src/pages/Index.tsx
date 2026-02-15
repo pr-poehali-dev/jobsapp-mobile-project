@@ -923,14 +923,19 @@ export default function Index() {
         onClose={() => setShowBalanceDialog(false)} 
         userId={currentUser?.id || ''}
         currentBalance={currentUser?.balance || 0}
-        onSuccess={() => {
-          // Обновить баланс пользователя
+        onSuccess={(newBalance, newTier) => {
           if (currentUser) {
-            // TODO: Получить актуальный баланс из API
-            toast({
-              title: 'Успешно',
-              description: 'Баланс будет обновлен после подтверждения платежа'
-            });
+            const updates: Partial<typeof currentUser> = {};
+            if (newBalance !== undefined) updates.balance = newBalance;
+            if (newTier) updates.tier = newTier as typeof currentUser.tier;
+            if (Object.keys(updates).length > 0) {
+              setCurrentUser({ ...currentUser, ...updates });
+            } else {
+              toast({
+                title: 'Успешно',
+                description: 'Баланс будет обновлен после подтверждения платежа'
+              });
+            }
           }
         }}
       />

@@ -14,7 +14,7 @@ interface BalanceTopUpProps {
   onClose: () => void;
   userId: string;
   currentBalance: number;
-  onSuccess?: (newBalance?: number) => void;
+  onSuccess?: (newBalance?: number, newTier?: string) => void;
 }
 
 export function BalanceTopUp({ open, onClose, userId, currentBalance, onSuccess }: BalanceTopUpProps) {
@@ -99,7 +99,7 @@ export function BalanceTopUp({ open, onClose, userId, currentBalance, onSuccess 
         setPromoResult({ success: true, message: data.message });
         setPromoCode('');
         toast({ title: 'Промо-код активирован', description: data.message });
-        onSuccess?.(data.new_balance);
+        onSuccess?.(data.new_balance, data.new_tier);
       } else {
         setPromoResult({ success: false, message: data.error || 'Ошибка активации' });
       }

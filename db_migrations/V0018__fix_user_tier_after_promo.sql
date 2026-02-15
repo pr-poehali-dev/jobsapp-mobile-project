@@ -1,0 +1,1 @@
+UPDATE users SET tier = 'ECONOM', vacancies_this_month = 0 WHERE id = '1869514a-d6ff-451e-be97-e4a72331fd75';
