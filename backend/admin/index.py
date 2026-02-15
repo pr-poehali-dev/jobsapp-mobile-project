@@ -62,6 +62,8 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 return delete_promo_code(event, conn)
         elif path == 'activate-promo':
             return activate_promo_code(event, conn)
+        elif path == 'reset-promo-activations':
+            return reset_promo_activations(event, conn)
         else:
             return error_response(404, 'Path not found')
     finally:
@@ -786,6 +788,20 @@ def activate_promo_code(event: Dict[str, Any], conn) -> Dict[str, Any]:
             }, default=str),
             'isBase64Encoded': False
         }
+
+
+def reset_promo_activations(event: dict, conn) -> Dict[str, Any]:
+    """Сброс всех активаций промо-кодов"""
+    with conn.cursor(cursor_factory=RealDictCursor) as cur:
+        cur.execute("DELETE FROM promo_activations")
+        cur.execute("UPDATE promo_codes SET current_activations = 0, is_active = true")
+        conn.commit()
+    return {
+        'statusCode': 200,
+        'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
+        'body': json.dumps({'success': True, 'message': 'Все активации сброшены'}),
+        'isBase64Encoded': False
+    }
 
 
 def error_response(status_code: int, message: str) -> Dict[str, Any]:
