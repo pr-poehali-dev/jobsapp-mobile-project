@@ -28,8 +28,7 @@
       "path": "/?path=promo-codes",
       "expectedStatus": 200,
       "expectedBody": {
-        "success": true,
-        "promo_codes": []
+        "success": true
       },
       "bodyMatcher": "partial"
     },

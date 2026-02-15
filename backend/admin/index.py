@@ -754,10 +754,9 @@ def activate_promo_code(event: Dict[str, Any], conn) -> Dict[str, Any]:
 
         if bonus_balance > 0:
             cur.execute("""
-                INSERT INTO transactions (id, user_id, amount, type, description)
-                VALUES (%s, %s, %s, 'deposit', %s)
+                INSERT INTO transactions (user_id, amount, type, status, description)
+                VALUES (%s, %s, 'deposit', 'completed', %s)
             """, (
-                f"promo_{promo['id']}_{user_id}",
                 user_id,
                 bonus_balance,
                 f"Промо-код {code}"
