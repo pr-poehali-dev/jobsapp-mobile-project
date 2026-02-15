@@ -594,7 +594,8 @@ def update_user_balance(event: Dict[str, Any], conn, context: Any) -> Dict[str, 
         if not user:
             return error_response(404, 'User not found')
         
-        transaction_id = f"txn_admin_{user_id}_{int(context.request_time_epoch)}"
+        import time
+        transaction_id = f"txn_admin_{user_id}_{int(time.time() * 1000)}"
         cur.execute("""
             INSERT INTO transactions (id, user_id, amount, type, description)
             VALUES (%s, %s, %s, %s, %s)
