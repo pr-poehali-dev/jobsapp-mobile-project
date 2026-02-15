@@ -1,0 +1,2 @@
+ALTER TABLE "t_p41246523_jobsapp_mobile_proje".users DROP CONSTRAINT email_or_phone_required;
+ALTER TABLE "t_p41246523_jobsapp_mobile_proje".users ADD CONSTRAINT email_or_phone_or_vk_required CHECK (email IS NOT NULL OR phone IS NOT NULL OR vk_id IS NOT NULL);
