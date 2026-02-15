@@ -39,10 +39,11 @@ def get_connection():
     return psycopg2.connect(os.environ['DATABASE_URL'])
 
 
+SCHEMA = '"t_p41246523_jobsapp_mobile_proje"'
+
+
 def get_schema() -> str:
-    """Get database schema prefix."""
-    schema = os.environ.get('MAIN_DB_SCHEMA', 'public')
-    return f"{schema}." if schema else ""
+    return f"{SCHEMA}."
 
 
 def cleanup_expired_tokens(cur, schema: str) -> None:
@@ -72,7 +73,7 @@ def get_jwt_secret() -> str:
 # JWT
 # =============================================================================
 
-def create_access_token(user_id: int, email: str | None = None) -> tuple[str, int]:
+def create_access_token(user_id: str, email: str | None = None) -> tuple[str, int]:
     """Create JWT access token."""
     secret = get_jwt_secret()
     expires_delta = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
@@ -334,8 +335,8 @@ def handle_callback(event: dict, origin: str) -> dict:
             row = cur.fetchone()
 
             if row:
-                # User found by vk_id - just login
                 user_id, email, name, db_avatar = row
+                user_id = str(user_id)
                 cur.execute(
                     f"UPDATE {S}users SET last_login_at = %s, updated_at = %s WHERE id = %s",
                     (now, now, user_id)
@@ -353,8 +354,8 @@ def handle_callback(event: dict, origin: str) -> dict:
                     row = cur.fetchone()
 
                 if vk_email and row:
-                    # User found by email - link VK account
                     user_id, db_name, db_avatar = row
+                    user_id = str(user_id)
                     cur.execute(
                         f"""UPDATE {S}users
                             SET vk_id = %s, avatar_url = COALESCE(avatar_url, %s),
@@ -366,15 +367,14 @@ def handle_callback(event: dict, origin: str) -> dict:
                     name = db_name or full_name
                     photo_url = db_avatar or photo_url
                 else:
-                    # 3. Create new user
                     cur.execute(
                         f"""INSERT INTO {S}users
                             (vk_id, email, name, avatar_url, email_verified, password_hash, role, created_at, updated_at, last_login_at)
                             VALUES (%s, %s, %s, %s, TRUE, '', 'seeker', %s, %s, %s)
                             RETURNING id""",
-                        (str(vk_user_id), vk_email, full_name, photo_url, now, now, now)
+                        (str(vk_user_id), vk_email, full_name or 'Пользователь VK', photo_url, now, now, now)
                     )
-                    user_id = cur.fetchone()[0]
+                    user_id = str(cur.fetchone()[0])
                     email = vk_email
                     name = full_name
 
@@ -398,7 +398,7 @@ def handle_callback(event: dict, origin: str) -> dict:
                 'refresh_token': refresh_token,
                 'expires_in': expires_in,
                 'user': {
-                    'id': user_id,
+                    'id': str(user_id),
                     'email': email,
                     'name': name or full_name,
                     'avatar_url': photo_url,
@@ -465,6 +465,7 @@ def handle_refresh(event: dict, origin: str) -> dict:
             return error(401, 'Invalid or expired refresh token', origin)
 
         user_id, email, name, avatar_url, vk_id = row
+        user_id = str(user_id)
 
         access_token, expires_in = create_access_token(user_id, email)
 
@@ -474,7 +475,7 @@ def handle_refresh(event: dict, origin: str) -> dict:
             'access_token': access_token,
             'expires_in': expires_in,
             'user': {
-                'id': user_id,
+                'id': str(user_id),
                 'email': email,
                 'name': name,
                 'avatar_url': avatar_url,
