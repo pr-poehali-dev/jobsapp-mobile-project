@@ -2,7 +2,10 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { PhoneInput } from '@/components/ui/phone-input';
+import { VkLoginButton } from '@/components/extensions/vk-auth/VkLoginButton';
 import { useState } from 'react';
+
+const VK_API_BASE = 'https://functions.poehali.dev/98c7ab8f-e10f-49ed-aa81-db6e7ee198d3';
 
 interface LoginFormProps {
   onSuccess: (token: string, user: any) => void;
@@ -17,6 +20,30 @@ export function LoginForm({ onSuccess, onSwitchToRegister }: LoginFormProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [countdown, setCountdown] = useState(0);
+  const [vkLoading, setVkLoading] = useState(false);
+
+  const handleVkLogin = async () => {
+    setVkLoading(true);
+    try {
+      const response = await fetch(`${VK_API_BASE}?action=auth_url`);
+      const data = await response.json();
+      if (!response.ok) {
+        setError(data.error || 'Не удалось получить ссылку авторизации VK');
+        setVkLoading(false);
+        return;
+      }
+      if (data.state) {
+        sessionStorage.setItem('vk_auth_state', data.state);
+      }
+      if (data.code_verifier) {
+        sessionStorage.setItem('vk_auth_code_verifier', data.code_verifier);
+      }
+      window.location.href = data.auth_url;
+    } catch {
+      setError('Ошибка сети');
+      setVkLoading(false);
+    }
+  };
 
   const handleInputChange = (value: string) => {
     if (value.startsWith('+7') || value.startsWith('7') || value.startsWith('8') || /^\d/.test(value)) {
@@ -201,6 +228,21 @@ export function LoginForm({ onSuccess, onSwitchToRegister }: LoginFormProps) {
       <Button className="w-full" onClick={sendCode} disabled={loading}>
         {loading ? 'Отправка...' : 'Получить код'}
       </Button>
+
+      <div className="relative my-4">
+        <div className="absolute inset-0 flex items-center">
+          <span className="w-full border-t" />
+        </div>
+        <div className="relative flex justify-center text-xs uppercase">
+          <span className="bg-background px-2 text-muted-foreground">или</span>
+        </div>
+      </div>
+
+      <VkLoginButton
+        onClick={handleVkLogin}
+        isLoading={vkLoading}
+        className="w-full"
+      />
 
       {onSwitchToRegister && (
         <div className="text-sm text-center">
