@@ -25,7 +25,7 @@ REFRESH_TOKEN_EXPIRE_DAYS = 30
 
 HEADERS = {
     'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Authorization, X-Session-Token',
     'Content-Type': 'application/json'
 }
 
@@ -526,6 +526,63 @@ def handle_logout(event: dict, origin: str) -> dict:
     return response(200, {'message': 'Logged out'}, origin)
 
 
+def handle_update_role(event: dict, origin: str) -> dict:
+    """Update user role using JWT auth."""
+    body_str = event.get('body', '{}')
+    if event.get('isBase64Encoded'):
+        body_str = base64.b64decode(body_str).decode('utf-8')
+
+    try:
+        payload = json.loads(body_str)
+    except json.JSONDecodeError:
+        return error(400, 'Invalid JSON', origin)
+
+    new_role = payload.get('role', '')
+    if new_role not in ('seeker', 'employer'):
+        return error(400, 'Неверная роль', origin)
+
+    headers = event.get('headers', {}) or {}
+    token = headers.get('X-Authorization', headers.get('Authorization', ''))
+    if token.startswith('Bearer '):
+        token = token[7:]
+    if not token:
+        token = headers.get('X-Session-Token', '')
+
+    if not token:
+        return error(401, 'Токен не указан', origin)
+
+    try:
+        secret = get_jwt_secret()
+        decoded = jwt.decode(token, secret, algorithms=['HS256'])
+        user_id = decoded.get('sub')
+    except jwt.ExpiredSignatureError:
+        return error(401, 'Токен истёк', origin)
+    except jwt.InvalidTokenError:
+        return error(401, 'Недействительный токен', origin)
+
+    if not user_id:
+        return error(401, 'Недействительный токен', origin)
+
+    S = get_schema()
+    conn = get_connection()
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            f"UPDATE {S}users SET role = %s, updated_at = %s WHERE id = %s RETURNING id",
+            (new_role, datetime.now(timezone.utc).isoformat(), user_id)
+        )
+        row = cur.fetchone()
+        if not row:
+            return error(404, 'Пользователь не найден', origin)
+        conn.commit()
+        return response(200, {'success': True, 'role': new_role}, origin)
+    except Exception as e:
+        conn.rollback()
+        return error(500, f'Database error: {str(e)}', origin)
+    finally:
+        conn.close()
+
+
 # =============================================================================
 # MAIN HANDLER
 # =============================================================================
@@ -547,6 +604,7 @@ def handler(event: dict, context) -> dict:
         'callback': handle_callback,
         'refresh': handle_refresh,
         'logout': handle_logout,
+        'update-role': handle_update_role,
     }
 
     if action not in handlers:

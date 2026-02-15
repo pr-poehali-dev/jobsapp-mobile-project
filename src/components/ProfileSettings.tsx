@@ -43,11 +43,17 @@ export function ProfileSettings({ open, onClose, user, onUpdate }: ProfileSettin
     setLoading(true);
     try {
       const token = localStorage.getItem('auth_token');
-      const res = await fetch('https://functions.poehali.dev/b3919417-c4e8-496a-982f-500d5754d530?path=update-role', {
+      const isVkUser = !!(user as any).vk_id;
+      const apiUrl = isVkUser
+        ? 'https://functions.poehali.dev/98c7ab8f-e10f-49ed-aa81-db6e7ee198d3?action=update-role'
+        : 'https://functions.poehali.dev/b3919417-c4e8-496a-982f-500d5754d530?path=update-role';
+      const res = await fetch(apiUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'X-Session-Token': token || ''
+          ...(isVkUser
+            ? { 'Authorization': `Bearer ${token}` }
+            : { 'X-Session-Token': token || '' })
         },
         body: JSON.stringify({ role: selectedRole })
       });

@@ -1179,9 +1179,9 @@ function ProfileDialog({ open, onClose, user, onAddBalance, onSelectTier, onCrea
           <DialogTitle>Личный кабинет</DialogTitle>
         </DialogHeader>
         <Tabs defaultValue="profile" className="w-full">
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className={`grid w-full ${user.role === 'employer' ? 'grid-cols-3' : 'grid-cols-1'}`}>
             <TabsTrigger value="profile">Профиль</TabsTrigger>
-            <TabsTrigger value="vacancies">Вакансии</TabsTrigger>
+            {user.role === 'employer' && <TabsTrigger value="vacancies">Вакансии</TabsTrigger>}
             {user.role === 'employer' && <TabsTrigger value="transactions">Транзакции</TabsTrigger>}
           </TabsList>
           
