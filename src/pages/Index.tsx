@@ -2033,7 +2033,7 @@ function TierDialog({
                         className="w-full border-destructive text-destructive hover:bg-destructive/10"
                         onClick={onAddBalance}
                       >
-                        Недостаточно средств — Пополнить
+                        Пополнить баланс
                       </Button>
                     )
                   )}
