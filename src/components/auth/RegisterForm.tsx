@@ -27,7 +27,7 @@ export function RegisterForm({ onSuccess, onSwitchToLogin, role }: RegisterFormP
   const handleVkLogin = async () => {
     setVkLoading(true);
     try {
-      const response = await fetch(`${VK_API_BASE}?action=auth_url`);
+      const response = await fetch(`${VK_API_BASE}?action=auth-url`);
       const data = await response.json();
       if (!response.ok) {
         setError(data.error || 'Не удалось получить ссылку авторизации VK');

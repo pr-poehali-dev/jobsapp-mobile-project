@@ -6,7 +6,7 @@ import { useToast } from '@/hooks/use-toast';
 const VK_API_BASE = 'https://functions.poehali.dev/98c7ab8f-e10f-49ed-aa81-db6e7ee198d3';
 
 const apiUrls = {
-  authUrl: `${VK_API_BASE}?action=auth_url`,
+  authUrl: `${VK_API_BASE}?action=auth-url`,
   callback: `${VK_API_BASE}?action=callback`,
   refresh: `${VK_API_BASE}?action=refresh`,
   logout: `${VK_API_BASE}?action=logout`,
