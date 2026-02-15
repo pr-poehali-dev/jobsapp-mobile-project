@@ -53,8 +53,8 @@ export function BalanceTopUp({ open, onClose, userId, userName, userEmail, curre
           user_email: userEmail || 'noreply@example.com',
           order_comment: 'Пополнение баланса',
           cart_items: [],
-          success_url: `${window.location.origin}?payment=success`,
-          fail_url: `${window.location.origin}?payment=fail`
+          success_url: `${window.location.origin}/payment-success`,
+          fail_url: `${window.location.origin}/payment-fail`
         })
       });
 
