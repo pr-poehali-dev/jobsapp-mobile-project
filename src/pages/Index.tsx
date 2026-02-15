@@ -975,6 +975,10 @@ export default function Index() {
           setShowTierDialog(false);
           toast({ title: 'Тариф изменен', description: `Теперь вы используете тариф ${tierName}` });
         }}
+        onAddBalance={() => {
+          setShowTierDialog(false);
+          setShowBalanceDialog(true);
+        }}
       />
       
       {/* Нижнее меню для работодателей */}
@@ -1926,11 +1930,13 @@ function TierDialog({
   onClose,
   currentUser,
   onSelectTier,
+  onAddBalance,
 }: {
   open: boolean;
   onClose: () => void;
   currentUser: User | null;
   onSelectTier: (tierName: string) => void;
+  onAddBalance: () => void;
 }) {
   return (
     <Dialog open={open} onOpenChange={onClose}>
@@ -2013,13 +2019,22 @@ function TierDialog({
                     )}
                   </div>
                   {!isCurrentTier && (
-                    <Button
-                      className="w-full"
-                      disabled={!canAfford && tier.price > 0}
-                      onClick={() => onSelectTier(tier.name)}
-                    >
-                      {!canAfford && tier.price > 0 ? 'Недостаточно средств' : 'Выбрать тариф'}
-                    </Button>
+                    canAfford || tier.price === 0 ? (
+                      <Button
+                        className="w-full"
+                        onClick={() => onSelectTier(tier.name)}
+                      >
+                        Выбрать тариф
+                      </Button>
+                    ) : (
+                      <Button
+                        variant="outline"
+                        className="w-full border-destructive text-destructive hover:bg-destructive/10"
+                        onClick={onAddBalance}
+                      >
+                        Недостаточно средств — Пополнить
+                      </Button>
+                    )
                   )}
                 </CardContent>
               </Card>
@@ -2054,13 +2069,22 @@ function TierDialog({
                       <span>После размещения ваша вакансия попадает вверх списка, до публикации новых вакансий пользователями</span>
                     </div>
                   </div>
-                  <Button
-                    className="w-full"
-                    disabled={!canAfford}
-                    onClick={() => onSelectTier(tier.name)}
-                  >
-                    {!canAfford ? 'Недостаточно средств' : 'Купить размещение'}
-                  </Button>
+                  {canAfford ? (
+                    <Button
+                      className="w-full"
+                      onClick={() => onSelectTier(tier.name)}
+                    >
+                      Купить размещение
+                    </Button>
+                  ) : (
+                    <Button
+                      variant="outline"
+                      className="w-full border-destructive text-destructive hover:bg-destructive/10"
+                      onClick={onAddBalance}
+                    >
+                      Недостаточно средств — Пополнить
+                    </Button>
+                  )}
                 </CardContent>
               </Card>
             );
@@ -2072,11 +2096,14 @@ function TierDialog({
           </p>
         </div>
         {currentUser && (
-          <div className="mt-4 p-3 bg-muted rounded-md">
+          <div className="mt-4 p-3 bg-muted rounded-md flex items-center justify-between">
             <p className="text-sm text-muted-foreground">
               <Icon name="Wallet" size={16} className="inline mr-1" />
-              Ваш баланс: <span className="font-semibold text-primary">{currentUser.balance} ₽</span>
+              Ваш баланс: <span className="font-semibold text-foreground">{currentUser.balance} ₽</span>
             </p>
+            <Button size="sm" onClick={onAddBalance}>
+              Пополнить
+            </Button>
           </div>
         )}
       </DialogContent>
