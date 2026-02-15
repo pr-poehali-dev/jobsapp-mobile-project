@@ -66,6 +66,7 @@ export function ProfileSettings({ open, onClose, user, onUpdate }: ProfileSettin
 
       const updatedUser = { ...user, role: selectedRole };
       onUpdate(updatedUser);
+      localStorage.setItem('currentUser', JSON.stringify(updatedUser));
 
       toast({
         title: 'Роль обновлена',
@@ -73,6 +74,7 @@ export function ProfileSettings({ open, onClose, user, onUpdate }: ProfileSettin
       });
 
       onClose();
+      window.location.reload();
     } catch (err: any) {
       toast({
         title: 'Ошибка',
