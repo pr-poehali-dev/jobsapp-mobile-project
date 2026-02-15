@@ -77,9 +77,9 @@ export function TransactionHistory({ userId }: TransactionHistoryProps) {
       case 'withdrawal':
         return <Icon name="ArrowUpFromLine" className="text-red-600" size={20} />;
       case 'purchase':
-        return <Icon name="ShoppingCart" className="text-blue-600" size={20} />;
+        return <Icon name="ShoppingCart" className="text-primary" size={20} />;
       default:
-        return <Icon name="Wallet" className="text-gray-600" size={20} />;
+        return <Icon name="Wallet" className="text-muted-foreground" size={20} />;
     }
   };
 
@@ -148,7 +148,7 @@ export function TransactionHistory({ userId }: TransactionHistoryProps) {
                     <p className={`font-semibold ${
                       transaction.type === 'deposit' ? 'text-green-600' : 
                       transaction.type === 'withdrawal' ? 'text-red-600' : 
-                      'text-gray-900'
+                      'text-foreground'
                     }`}>
                       {transaction.type === 'deposit' ? '+' : '-'}{transaction.amount} ₽
                     </p>

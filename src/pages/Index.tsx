@@ -541,7 +541,7 @@ export default function Index() {
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
-      <header className="sticky top-0 z-50 bg-accent text-accent-foreground shadow-md h-12 md:h-auto">
+      <header className="sticky top-0 z-50 bg-gradient-to-r from-violet-600 via-purple-600 to-indigo-600 text-white shadow-md h-12 md:h-auto">
         <div className="container mx-auto px-2 md:px-4 h-12 md:h-auto md:py-3 flex items-center justify-between">
           <div className="flex items-center gap-1 md:gap-2">
             <Icon name="Briefcase" size={16} className="md:w-6 md:h-6" />
@@ -562,7 +562,7 @@ export default function Index() {
                     size="sm" 
                     variant="outline" 
                     onClick={() => setShowAdminDialog(true)}
-                    className="bg-white text-gray-900 border-gray-300 hover:bg-gray-50 text-xs md:text-sm px-2 md:px-3 h-7 md:h-9"
+                    className="bg-white/20 text-white border-white/30 hover:bg-white/30 text-xs md:text-sm px-2 md:px-3 h-7 md:h-9"
                   >
                     <Icon name="Shield" size={14} className="mr-1 md:mr-2 md:w-4 md:h-4" />
                     <span className="hidden md:inline">Админка</span>
@@ -602,11 +602,11 @@ export default function Index() {
                     size="sm" 
                     variant="outline" 
                     onClick={() => setShowProfileDialog(true)}
-                    className="hidden md:flex bg-white text-gray-900 border-gray-300 hover:bg-gray-50"
+                    className="hidden md:flex bg-white/20 text-white border-white/30 hover:bg-white/30"
                   >
                     {currentUser.name}
                     {currentUser.role === 'employer' && (
-                      <Badge variant="secondary" className="ml-2 bg-blue-100 text-blue-900">
+                      <Badge variant="secondary" className="ml-2 bg-primary/10 text-primary">
                         {currentUser.balance} ₽
                       </Badge>
                     )}
@@ -615,7 +615,7 @@ export default function Index() {
                     size="icon" 
                     variant="outline" 
                     onClick={() => setShowProfileDialog(true)}
-                    className="md:hidden rounded-full h-7 w-7 md:h-10 md:w-10 bg-white text-gray-900 border-gray-300 hover:bg-gray-50"
+                    className="md:hidden rounded-full h-7 w-7 md:h-10 md:w-10 bg-white/20 text-white border-white/30 hover:bg-white/30"
                   >
                     <Icon name="User" size={16} className="md:w-5 md:h-5" />
                   </Button>
@@ -862,7 +862,7 @@ export default function Index() {
         </div>
       </div>
 
-      <footer className={`bg-accent text-accent-foreground py-4 mt-8 relative z-10 ${currentUser?.role === 'employer' ? 'md:block hidden' : ''}`}>
+      <footer className={`bg-gradient-to-r from-violet-600 via-purple-600 to-indigo-600 text-white py-4 mt-8 relative z-10 ${currentUser?.role === 'employer' ? 'md:block hidden' : ''}`}>
         <div className="container mx-auto px-4 text-center text-sm">
           <p>Обратная связь: jobs-app@yandex.ru</p>
         </div>

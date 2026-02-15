@@ -16,7 +16,7 @@ const Icon: React.FC<IconProps> = ({ name, fallback = 'CircleAlert', ...props })
 
     // Если даже fallback не найден, возвращаем пустой span
     if (!FallbackIcon) {
-      return <span className="text-xs text-gray-400">[icon]</span>;
+      return <span className="text-xs text-muted-foreground">[icon]</span>;
     }
 
     return <FallbackIcon {...props} />;

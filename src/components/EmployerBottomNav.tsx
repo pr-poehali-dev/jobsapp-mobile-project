@@ -37,8 +37,8 @@ export function EmployerBottomNav({ currentUser, vacancies, onTierClick, onDelet
   const rejectedVacancies = vacancies.filter(v => v.status === 'rejected');
 
   const tierInfo: Record<string, { name: string; price: number; limit: number; badge: string; color: string }> = {
-    'FREE': { name: 'Бесплатный', price: 0, limit: 0, badge: '', color: 'bg-gray-400' },
-    'ECONOM': { name: 'Эконом', price: 100, limit: 5, badge: '', color: 'bg-blue-500' },
+    'FREE': { name: 'Бесплатный', price: 0, limit: 0, badge: '', color: 'bg-muted-foreground' },
+    'ECONOM': { name: 'Эконом', price: 100, limit: 5, badge: '', color: 'bg-primary' },
     'VIP': { name: 'VIP', price: 500, limit: 30, badge: '⭐', color: 'bg-purple-500' },
     'PREMIUM': { name: 'Premium', price: 2500, limit: 150, badge: '👑', color: 'bg-amber-500' }
   };
