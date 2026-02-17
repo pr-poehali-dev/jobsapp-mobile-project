@@ -163,15 +163,14 @@ def update_user(event: Dict[str, Any], conn, context: Any) -> Dict[str, Any]:
             return error_response(404, 'User not found')
         
         if body.get('add_transaction'):
-            transaction_id = f"txn_{user_id}_{int(context.request_time_epoch)}"
             cur.execute("""
-                INSERT INTO transactions (id, user_id, amount, type, description)
+                INSERT INTO transactions (user_id, amount, type, status, description)
                 VALUES (%s, %s, %s, %s, %s)
             """, (
-                transaction_id,
                 user_id,
                 body.get('transaction_amount', 0),
                 body.get('transaction_type', 'deposit'),
+                'completed',
                 body.get('transaction_description', 'Balance update')
             ))
             conn.commit()
@@ -594,12 +593,10 @@ def update_user_balance(event: Dict[str, Any], conn, context: Any) -> Dict[str, 
         if not user:
             return error_response(404, 'User not found')
         
-        import time
-        transaction_id = f"txn_admin_{user_id}_{int(time.time() * 1000)}"
         cur.execute("""
-            INSERT INTO transactions (id, user_id, amount, type, description)
-            VALUES (%s, %s, %s, %s, %s)
-        """, (transaction_id, user_id, amount, 'deposit' if amount > 0 else 'withdrawal', description))
+            INSERT INTO transactions (user_id, amount, type, status, description)
+            VALUES (%s, %s, %s, 'completed', %s)
+        """, (user_id, amount, 'deposit' if amount > 0 else 'withdrawal', description))
         
         conn.commit()
         
